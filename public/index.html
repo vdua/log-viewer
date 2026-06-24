@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HDFC Wizard Log Explorer</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div id="app" class="app-container">
+    
+    <!-- Screen 1: Session Selector (Clean Landing Page) -->
+    <div id="screen-selector" class="screen active">
+      <div class="landing-hero">
+        <div class="logo-wrapper">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h1>Wizard Log Explorer</h1>
+        </div>
+        <p class="subtitle">Inspect and trace wizard API requests and states</p>
+      </div>
+
+      <div class="search-container">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="dir-search" placeholder="Search log folders..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="session-list-container">
+        <div class="list-header">
+          <span>Log Directory</span>
+          <span class="text-right">APIs Count</span>
+          <span class="text-right">Size</span>
+          <span>Last Modified</span>
+        </div>
+        <div id="session-list" class="session-list">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading available logs...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 2 & 3: Unified Dashboard (Split Pane Layout) -->
+    <div id="screen-dashboard" class="screen">
+      
+      <!-- Top Navigation Header -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <button id="btn-back" class="btn-icon-label" title="Back to Session List">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Sessions</span>
+          </button>
+          <div class="header-divider"></div>
+          <div class="active-session-info">
+            <span class="session-label">Active Session</span>
+            <h2 id="active-session-name" class="session-name">network-...</h2>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <div class="session-stats">
+            <span class="stat-pill success"><strong id="stat-200">0</strong> Success</span>
+            <span class="stat-pill error"><strong id="stat-500">0</strong> Errors</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Top-level search for payloads -->
+      <div class="payload-search-filter-bar">
+        <svg class="top-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="top-payload-search" placeholder="Search request & response payloads for keys or values (e.g. mobileNumber, leadProfileId, errorMsg)..." autocomplete="off">
+      </div>
+
+      <!-- Main Dashboard Split Pane -->
+      <main class="dashboard-body">
+        
+        <!-- Left Pane: API List -->
+        <section id="left-pane" class="pane">
+          <div class="pane-header">
+            <h3>API Transactions</h3>
+            <span id="api-count" class="count-badge">0 / 0</span>
+          </div>
+          <div id="api-list" class="api-list">
+            <!-- Dynamically populated items -->
+          </div>
+        </section>
+
+        <!-- Right Pane: Details Inspector -->
+        <section id="right-pane" class="pane">
+          
+          <!-- Empty Inspector State -->
+          <div id="inspector-empty" class="inspector-empty">
+            <svg class="inspector-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <h4>Select an API Call</h4>
+            <p>Click on any network transaction on the left to inspect its payloads and wizard state.</p>
+          </div>
+
+          <!-- Active Inspector Area -->
+          <div id="inspector-active" class="inspector-active" style="display:none;">
+            <!-- Details Header -->
+            <div class="inspector-header">
+              <div class="method-path-status">
+                <span id="inspect-method" class="badge">POST</span>
+                <span id="inspect-path" class="path">/api/login.json</span>
+                <span id="inspect-status" class="status-pill green">200</span>
+              </div>
+            </div>
+
+            <!-- Content (Unified Scrollable View) -->
+            <div class="inspector-content">
+              
+              <!-- Wizard State Info (Only visible when available) -->
+              <div id="section-state" class="details-section">
+                <div class="section-title-bar">
+                  <svg class="section-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  <h4>Wizard State Info</h4>
+                  <div class="payload-search-container">
+                    <input type="text" class="input-payload-search" placeholder="Find in State..." data-target="state-json-content">
+                    <span class="match-count" id="state-match-count"></span>
+                  </div>
+                  <button class="btn-copy" data-target="state-json-content">Copy State</button>
+                </div>
+                <div class="payload-body">
+                  <pre><code id="state-json-content" class="code-block"></code></pre>
+                </div>
+              </div>
+
+              <!-- Request Body -->
+              <div id="section-req" class="details-section">
+                <div class="section-title-bar">
+                  <svg class="section-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  <h4>Request Body</h4>
+                  <div class="payload-search-container">
+                    <input type="text" class="input-payload-search" placeholder="Find in Request..." data-target="req-json-content">
+                    <span class="match-count" id="req-match-count"></span>
+                  </div>
+                  <button class="btn-copy" data-target="req-json-content">Copy Request</button>
+                </div>
+                <div class="payload-body">
+                  <pre><code id="req-json-content" class="code-block"></code></pre>
+                </div>
+              </div>
+
+              <!-- Response Body -->
+              <div id="section-res" class="details-section">
+                <div class="section-title-bar">
+                  <svg class="section-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  <h4>Response Body</h4>
+                  <div class="payload-search-container">
+                    <input type="text" class="input-payload-search" placeholder="Find in Response..." data-target="res-json-content">
+                    <span class="match-count" id="res-match-count"></span>
+                  </div>
+                  <button class="btn-copy" data-target="res-json-content">Copy Response</button>
+                </div>
+                <div class="payload-body">
+                  <pre><code id="res-json-content" class="code-block"></code></pre>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
