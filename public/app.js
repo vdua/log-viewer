@@ -4,7 +4,10 @@ let state = {
   selectedSession: null,
   apis: [],
   bodies: {},
-  selectedApiId: null
+  selectedApiId: null,
+  apps: [],
+  activeApp: '',
+  activeLogsDir: ''
 };
 
 // DOM Elements
@@ -36,18 +39,31 @@ const el = {
   sectionState: document.getElementById('section-state'),
   stateJsonContent: document.getElementById('state-json-content'),
   reqJsonContent: document.getElementById('req-json-content'),
-  resJsonContent: document.getElementById('res-json-content')
+  resJsonContent: document.getElementById('res-json-content'),
+  
+  // Screenshot blocks
+  sectionScreenshot: document.getElementById('section-screenshot'),
+  screenshotImage: document.getElementById('screenshot-image'),
+  btnCleanAll: document.getElementById('btn-clean-all'),
+
+  // Application Workspaces Elements
+  appList: document.getElementById('app-list'),
+  addAppForm: document.getElementById('add-app-form'),
+  appPathInput: document.getElementById('app-path-input')
 };
 
 // --- APP INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
-  loadSessions();
+  loadApps();
 });
 
 function initEventListeners() {
-  // Screen 1: Search Directories
+  // Screen 1: Search Directories & Clean All
   el.dirSearch.addEventListener('input', renderSessions);
+  if (el.btnCleanAll) {
+    el.btnCleanAll.addEventListener('click', cleanAllSessions);
+  }
   
   // Header: Go Back
   el.btnBack.addEventListener('click', showSessionSelector);
@@ -55,6 +71,11 @@ function initEventListeners() {
   // Top-level payload filtering
   el.topPayloadSearch.addEventListener('input', applyTopPayloadSearch);
   
+  // Workspace Manager: Submit new app
+  if (el.addAppForm) {
+    el.addAppForm.addEventListener('submit', handleAddApp);
+  }
+
   // Accordion Toggle
   document.querySelectorAll('.section-title-bar').forEach(bar => {
     bar.addEventListener('click', () => {
@@ -96,6 +117,150 @@ function initEventListeners() {
   });
 }
 
+// --- WORKSPACE MANAGEMENT ---
+
+async function loadApps() {
+  try {
+    const res = await fetch('/api/apps');
+    const data = await res.json();
+    state.apps = data.apps || [];
+    state.activeApp = data.activeApp || '';
+    state.activeLogsDir = data.activeLogsDir || '';
+    renderApps();
+    await loadSessions();
+  } catch (err) {
+    console.error('Failed to load apps:', err);
+    el.appList.innerHTML = `
+      <div class="empty-state">
+        <p style="color: var(--error)">Error loading workspaces. Check if the backend server is running.</p>
+      </div>
+    `;
+  }
+}
+
+function renderApps() {
+  if (state.apps.length === 0) {
+    el.appList.innerHTML = `
+      <div class="empty-state">
+        <p>No application workspaces registered.</p>
+      </div>
+    `;
+    return;
+  }
+
+  el.appList.innerHTML = state.apps.map((app, index) => {
+    const isActive = app === state.activeApp;
+    const isDefault = index === 0;
+    
+    // Check path for code/test/integration/logs relative to the app
+    const resolvedLogsPath = app + (app.endsWith('/') || app.endsWith('\\') ? '' : '/') + 'code/test/integration/logs';
+
+    const deleteBtn = isDefault ? '' : `
+      <button class="btn-delete-app" data-path="${app}" title="Remove Workspace">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </button>
+    `;
+
+    return `
+      <div class="app-item ${isActive ? 'active' : ''}" data-path="${app}">
+        <div class="app-item-info">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${isActive ? '<span class="app-badge">Active</span>' : ''}
+            <span class="app-path" title="${app}">${app}</span>
+          </div>
+          <span class="app-logs-resolved" title="${resolvedLogsPath}">Logs path: ${resolvedLogsPath}</span>
+        </div>
+        ${deleteBtn}
+      </div>
+    `;
+  }).join('');
+
+  // Click handler to activate app
+  el.appList.querySelectorAll('.app-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-delete-app')) return;
+      const path = item.getAttribute('data-path');
+      selectActiveApp(path);
+    });
+  });
+
+  // Delete handler
+  el.appList.querySelectorAll('.btn-delete-app').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const path = btn.getAttribute('data-path');
+      if (confirm(`Are you sure you want to remove workspace "${path}"?`)) {
+        removeApp(path);
+      }
+    });
+  });
+}
+
+async function selectActiveApp(path) {
+  try {
+    const res = await fetch('/api/apps/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const result = await res.json();
+    if (result.success) {
+      loadApps();
+    } else {
+      alert(`Error: ${result.error || 'Failed to select workspace'}`);
+    }
+  } catch (err) {
+    console.error('Failed to select workspace:', err);
+    alert('Server error setting workspace.');
+  }
+}
+
+async function removeApp(path) {
+  try {
+    const res = await fetch('/api/apps', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const result = await res.json();
+    if (result.success) {
+      loadApps();
+    } else {
+      alert(`Error: ${result.error || 'Failed to remove workspace'}`);
+    }
+  } catch (err) {
+    console.error('Failed to remove workspace:', err);
+    alert('Server error removing workspace.');
+  }
+}
+
+async function handleAddApp(e) {
+  e.preventDefault();
+  const path = el.appPathInput.value.trim();
+  if (!path) return;
+
+  try {
+    const res = await fetch('/api/apps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const result = await res.json();
+    if (result.success) {
+      el.appPathInput.value = '';
+      loadApps();
+    } else {
+      alert(`Error: ${result.error || 'Failed to register workspace'}`);
+    }
+  } catch (err) {
+    console.error('Failed to register workspace:', err);
+    alert('Server error registering workspace. Please verify the absolute path exists.');
+  }
+}
+
 // --- SCREEN 1: SESSION SELECTOR ---
 
 async function loadSessions() {
@@ -128,7 +293,9 @@ function renderSessions() {
   
   el.sessionList.innerHTML = filtered.map(s => {
     const dateStr = new Date(s.createdAt).toLocaleString();
-    const sizeMB = (s.sizeBytes / (1024 * 1024)).toFixed(2);
+    const sizeStr = s.sizeBytes >= 1024 * 1024 
+      ? `${(s.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
+      : `${(s.sizeBytes / 1024).toFixed(2)} KB`;
     
     return `
       <div class="session-item" data-name="${s.name}">
@@ -141,8 +308,16 @@ function renderSessions() {
           </div>
         </div>
         <div class="text-right">${s.totalApis} calls</div>
-        <div class="text-right">${sizeMB} MB</div>
+        <div class="text-right">${sizeStr}</div>
         <div class="session-meta">${dateStr}</div>
+        <div class="action-cell">
+          <button class="btn-delete-session" data-name="${s.name}" title="Delete Session">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-icon">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
       </div>
     `;
   }).join('');
@@ -152,6 +327,17 @@ function renderSessions() {
     item.addEventListener('click', () => {
       const name = item.getAttribute('data-name');
       selectSession(name);
+    });
+  });
+
+  // Attach delete handlers
+  el.sessionList.querySelectorAll('.btn-delete-session').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = btn.getAttribute('data-name');
+      if (confirm(`Are you sure you want to delete session "${name}"?`)) {
+        deleteSession(name);
+      }
     });
   });
 }
@@ -167,6 +353,42 @@ function showSessionSelector() {
   el.dirSearch.value = '';
   el.topPayloadSearch.value = '';
   loadSessions();
+}
+
+async function deleteSession(name) {
+  try {
+    const res = await fetch(`/api/logs/${name}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      loadSessions();
+    } else {
+      alert(`Error: ${result.error || 'Failed to delete session'}`);
+    }
+  } catch (err) {
+    console.error('Failed to delete session:', err);
+    alert('Failed to delete session. Server error.');
+  }
+}
+
+async function cleanAllSessions() {
+  if (state.sessions.length === 0) {
+    alert('No sessions to clean.');
+    return;
+  }
+  if (confirm('Are you sure you want to clean ALL log sessions? This will permanently delete all session folders and flat log files.')) {
+    try {
+      const res = await fetch('/api/logs', { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        loadSessions();
+      } else {
+        alert(`Error: ${result.error || 'Failed to clean all sessions'}`);
+      }
+    } catch (err) {
+      console.error('Failed to clean all sessions:', err);
+      alert('Failed to clean all sessions. Server error.');
+    }
+  }
 }
 
 // --- SCREEN 2 & 3: DASHBOARD ---
@@ -336,6 +558,16 @@ function renderInspector() {
     el.sectionState.style.display = 'none';
     el.stateJsonContent.innerText = '';
     el.stateJsonContent.dataset.raw = '';
+  }
+
+  // Render Screenshot if present
+  if (bodies.res && bodies.res.screenshot) {
+    el.sectionScreenshot.style.display = 'block';
+    el.sectionScreenshot.classList.remove('collapsed');
+    el.screenshotImage.src = bodies.res.screenshot;
+  } else {
+    el.sectionScreenshot.style.display = 'none';
+    el.screenshotImage.src = '';
   }
 }
 
