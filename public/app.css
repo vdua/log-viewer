@@ -733,6 +733,14 @@ body {
   position: relative;
 }
 
+.payload-body pre {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 /* Collapsed Accordion State */
 .details-section.collapsed {
   border-bottom-left-radius: 6px;
@@ -760,6 +768,8 @@ body {
   background: transparent;
   padding: 14px;
   display: block;
+  width: max-content;
+  min-width: 100%;
   white-space: pre;
   tab-size: 2;
   -moz-tab-size: 2;

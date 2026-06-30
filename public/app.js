@@ -412,7 +412,14 @@ async function selectSession(folderName) {
     ]);
     
     state.apis = await apisRes.json();
-    state.bodies = await bodiesRes.json();
+    const rawBodies = await bodiesRes.json();
+    state.bodies = {};
+    for (const [id, body] of Object.entries(rawBodies)) {
+      state.bodies[id] = {
+        req: parseStringifiedJSON(body.req),
+        res: parseStringifiedJSON(body.res)
+      };
+    }
     
     // Process stats
     const successCount = state.apis.filter(a => a.status >= 200 && a.status < 300).length;
@@ -644,6 +651,21 @@ function applyTopPayloadSearch() {
   
   const filtered = state.apis.filter(api => {
     const bodies = state.bodies[api.id];
+    
+    const apiIdStr = (api.id !== undefined && api.id !== null) ? api.id.toString().toLowerCase() : '';
+    const apiMethod = api.method ? api.method.toLowerCase() : '';
+    const apiPath = api.path ? api.path.toLowerCase() : '';
+    const apiStatus = (api.status !== undefined && api.status !== null) ? api.status.toString().toLowerCase() : '';
+    const apiScenario = api.scenario ? api.scenario.toLowerCase() : '';
+
+    if (apiIdStr.includes(query) ||
+        apiMethod.includes(query) ||
+        apiPath.includes(query) ||
+        apiStatus.includes(query) ||
+        apiScenario.includes(query)) {
+      return true;
+    }
+
     if (!bodies) return false;
     
     // Convert payloads directly to lowercase strings
@@ -676,4 +698,31 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function parseStringifiedJSON(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    const trimmed = obj.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return parseStringifiedJSON(parsed);
+      } catch (e) {
+        return obj;
+      }
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => parseStringifiedJSON(item));
+  }
+  if (typeof obj === 'object') {
+    const copy = {};
+    for (const key of Object.keys(obj)) {
+      copy[key] = parseStringifiedJSON(obj[key]);
+    }
+    return copy;
+  }
+  return obj;
 }
