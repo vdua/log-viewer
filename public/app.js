@@ -115,6 +115,27 @@ function initEventListeners() {
       }
     });
   });
+
+  // Expand / Collapse JSON Buttons
+  document.querySelectorAll('.btn-json-action').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent collapsing accordion section
+      const action = btn.getAttribute('data-action');
+      const targetId = btn.getAttribute('data-target');
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) {
+        if (action === 'expand') {
+          targetEl.querySelectorAll('.json-collapsible').forEach(node => {
+            node.classList.remove('collapsed');
+          });
+        } else if (action === 'collapse') {
+          targetEl.querySelectorAll('.json-collapsible').forEach(node => {
+            node.classList.add('collapsed');
+          });
+        }
+      }
+    });
+  });
 }
 
 // --- WORKSPACE MANAGEMENT ---
@@ -546,11 +567,11 @@ function renderInspector() {
   
   // Render Payloads inside pre blocks
   const reqStr = bodies.req ? JSON.stringify(bodies.req, null, 2) : 'null';
-  el.reqJsonContent.innerText = reqStr;
+  renderJsonToElement(bodies.req, el.reqJsonContent);
   el.reqJsonContent.dataset.raw = reqStr;
   
   const resStr = bodies.res ? JSON.stringify(bodies.res, null, 2) : 'null';
-  el.resJsonContent.innerText = resStr;
+  renderJsonToElement(bodies.res, el.resJsonContent);
   el.resJsonContent.dataset.raw = resStr;
   
   // Extract and render stateInfo if it exists
@@ -559,11 +580,11 @@ function renderInspector() {
     el.sectionState.style.display = 'block';
     el.sectionState.classList.remove('collapsed'); // ensure open when new data loads
     const stateStr = JSON.stringify(stateInfo, null, 2);
-    el.stateJsonContent.innerText = stateStr;
+    renderJsonToElement(stateInfo, el.stateJsonContent);
     el.stateJsonContent.dataset.raw = stateStr;
   } else {
     el.sectionState.style.display = 'none';
-    el.stateJsonContent.innerText = '';
+    el.stateJsonContent.innerHTML = '';
     el.stateJsonContent.dataset.raw = '';
   }
 
@@ -595,9 +616,15 @@ function handlePayloadSearch(e) {
   
   const rawData = targetEl.dataset.raw;
   
-  if (!query) {
-    // Reset back to original raw text
+  // Always start by rendering the clean JSON tree
+  try {
+    const parsed = JSON.parse(rawData);
+    renderJsonToElement(parsed, targetEl);
+  } catch (err) {
     targetEl.innerText = rawData;
+  }
+  
+  if (!query) {
     if (countEl) {
       countEl.innerText = '';
       countEl.className = 'match-count';
@@ -605,20 +632,45 @@ function handlePayloadSearch(e) {
     return;
   }
   
-  // Escape HTML before injecting match tags
-  const escapedData = escapeHtml(rawData);
-  
   // Escape special regex character tokens
   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(escapedQuery, 'gi');
   
   let matchCount = 0;
-  const highlightedHtml = escapedData.replace(regex, (match) => {
-    matchCount++;
-    return `<mark class="json-highlight">${match}</mark>`;
-  });
   
-  targetEl.innerHTML = highlightedHtml;
+  // Check if a tree view is present
+  const jsonCollapsible = targetEl.querySelector('.json-node');
+  if (jsonCollapsible) {
+    const textElements = targetEl.querySelectorAll('.json-key, .json-string, .json-number, .json-boolean, .json-null');
+    textElements.forEach(el => {
+      const text = el.textContent;
+      if (regex.test(text)) {
+        // Highlight matches
+        const highlightedHtml = text.replace(regex, (match) => {
+          matchCount++;
+          return `<mark class="json-highlight">${match}</mark>`;
+        });
+        el.innerHTML = highlightedHtml;
+        
+        // Auto-expand all parent elements to make this match visible
+        let parent = el.closest('.json-node');
+        while (parent && targetEl.contains(parent)) {
+          if (parent.classList.contains('collapsed')) {
+            parent.classList.remove('collapsed');
+          }
+          parent = parent.parentElement.closest('.json-node');
+        }
+      }
+    });
+  } else {
+    // Fallback if not a tree (e.g. plain text response)
+    const escapedData = escapeHtml(rawData);
+    const highlightedHtml = escapedData.replace(regex, (match) => {
+      matchCount++;
+      return `<mark class="json-highlight">${match}</mark>`;
+    });
+    targetEl.innerHTML = highlightedHtml;
+  }
   
   if (countEl) {
     if (matchCount > 0) {
@@ -725,4 +777,145 @@ function parseStringifiedJSON(obj) {
     return copy;
   }
   return obj;
+}
+
+// --- COLLAPSIBLE JSON TREE RENDERING FUNCTIONS ---
+
+function buildJsonTreeDOM(val, isLast = true, key = null) {
+  const node = document.createElement('div');
+  node.className = 'json-node';
+
+  // Key element
+  if (key !== null) {
+    const keySpan = document.createElement('span');
+    keySpan.className = 'json-key';
+    keySpan.textContent = JSON.stringify(key) + ': ';
+    node.appendChild(keySpan);
+  }
+
+  const isObject = val !== null && typeof val === 'object';
+
+  if (isObject) {
+    node.classList.add('json-collapsible');
+    
+    // Add toggle icon
+    const toggle = document.createElement('span');
+    toggle.className = 'json-toggle';
+    toggle.textContent = '▼';
+    if (node.firstChild) {
+      node.insertBefore(toggle, node.firstChild);
+    } else {
+      node.appendChild(toggle);
+    }
+
+    const isArray = Array.isArray(val);
+    const openBrace = isArray ? '[' : '{';
+    const closeBrace = isArray ? ']' : '}';
+
+    const openSpan = document.createElement('span');
+    openSpan.className = 'json-bracket';
+    openSpan.textContent = openBrace;
+    node.appendChild(openSpan);
+
+    // Placeholder for collapsed state
+    const placeholder = document.createElement('span');
+    placeholder.className = 'json-placeholder';
+    const count = isArray ? val.length : Object.keys(val).length;
+    placeholder.textContent = isArray ? `[${count} items]` : `{${count} props}`;
+    node.appendChild(placeholder);
+
+    // Children container
+    const childrenDiv = document.createElement('div');
+    childrenDiv.className = 'json-children';
+
+    const keys = isArray ? null : Object.keys(val);
+    const length = isArray ? val.length : keys.length;
+
+    if (isArray) {
+      for (let i = 0; i < length; i++) {
+        const childNode = buildJsonTreeDOM(val[i], i === length - 1);
+        childrenDiv.appendChild(childNode);
+      }
+    } else {
+      for (let i = 0; i < length; i++) {
+        const childKey = keys[i];
+        const childNode = buildJsonTreeDOM(val[childKey], i === length - 1, childKey);
+        childrenDiv.appendChild(childNode);
+      }
+    }
+    node.appendChild(childrenDiv);
+
+    const closeSpan = document.createElement('span');
+    closeSpan.className = 'json-bracket';
+    closeSpan.textContent = closeBrace;
+    node.appendChild(closeSpan);
+
+    // Click handler for toggle / placeholder / opening bracket
+    const toggleCollapse = (e) => {
+      e.stopPropagation();
+      node.classList.toggle('collapsed');
+    };
+    toggle.addEventListener('click', toggleCollapse);
+    placeholder.addEventListener('click', toggleCollapse);
+    openSpan.addEventListener('click', toggleCollapse);
+  } else {
+    // Primitive values
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'json-value';
+    if (typeof val === 'string') {
+      valueSpan.classList.add('json-string');
+      valueSpan.textContent = JSON.stringify(val);
+    } else if (typeof val === 'number') {
+      valueSpan.classList.add('json-number');
+      valueSpan.textContent = String(val);
+    } else if (typeof val === 'boolean') {
+      valueSpan.classList.add('json-boolean');
+      valueSpan.textContent = String(val);
+    } else if (val === null) {
+      valueSpan.classList.add('json-null');
+      valueSpan.textContent = 'null';
+    } else {
+      valueSpan.classList.add('json-other');
+      valueSpan.textContent = String(val);
+    }
+    node.appendChild(valueSpan);
+  }
+
+  // Comma
+  if (!isLast) {
+    const commaSpan = document.createElement('span');
+    commaSpan.className = 'json-comma';
+    commaSpan.textContent = ',';
+    node.appendChild(commaSpan);
+  }
+
+  return node;
+}
+
+function renderJsonToElement(val, containerEl) {
+  containerEl.innerHTML = '';
+  if (val === null || val === undefined) {
+    const nullSpan = document.createElement('span');
+    nullSpan.className = 'json-value json-null';
+    nullSpan.textContent = 'null';
+    containerEl.appendChild(nullSpan);
+    return;
+  }
+  
+  if (typeof val !== 'object') {
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'json-value';
+    if (typeof val === 'string') {
+      valueSpan.classList.add('json-string');
+      valueSpan.textContent = JSON.stringify(val);
+    } else {
+      valueSpan.classList.add(typeof val === 'number' ? 'json-number' : (typeof val === 'boolean' ? 'json-boolean' : 'json-other'));
+      valueSpan.textContent = String(val);
+    }
+    containerEl.appendChild(valueSpan);
+    return;
+  }
+
+  const tree = buildJsonTreeDOM(val, true);
+  containerEl.appendChild(tree);
 }

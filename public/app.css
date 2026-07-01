@@ -1042,3 +1042,131 @@ mark.json-highlight {
   width: 16px;
   height: 16px;
 }
+
+/* --- COLLAPSIBLE JSON TREE VIEW --- */
+.code-block {
+  padding: 14px 14px 14px 24px !important; /* Extra left padding for top-level toggle */
+}
+
+.json-node {
+  display: block;
+  line-height: 1.6;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.json-node.json-collapsible {
+  position: relative;
+}
+
+.json-children {
+  display: block;
+  padding-left: 20px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.08);
+  margin-left: 6px;
+}
+
+.json-toggle {
+  cursor: pointer;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  margin-left: -18px;
+  margin-right: 4px;
+  user-select: none;
+  transition: transform 0.15s ease;
+  color: var(--text-muted);
+  font-size: 9px;
+  vertical-align: middle;
+}
+
+.json-node.collapsed > .json-toggle {
+  transform: rotate(-90deg);
+}
+
+.json-node.collapsed > .json-children {
+  display: none;
+}
+
+.json-node.collapsed > .json-placeholder {
+  display: inline-block;
+}
+
+.json-node:not(.collapsed) > .json-placeholder {
+  display: none;
+}
+
+.json-placeholder {
+  color: var(--accent-purple, #a580ff);
+  font-style: italic;
+  cursor: pointer;
+  background: rgba(165, 128, 255, 0.1);
+  border: 1px solid rgba(165, 128, 255, 0.2);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  margin: 0 4px;
+  user-select: none;
+  font-family: var(--font-sans);
+  transition: all 0.2s;
+}
+
+.json-placeholder:hover {
+  background: rgba(165, 128, 255, 0.2);
+  color: var(--text-bright);
+}
+
+.json-key {
+  color: #79c0ff; /* Sleek light blue for keys */
+  font-weight: 500;
+}
+
+.json-string {
+  color: #a5d6ff; /* Beautiful light blue/green for strings */
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.json-number {
+  color: #ff7b72; /* Salmon red for numbers */
+}
+
+.json-boolean {
+  color: #ff7b72; /* Salmon red for booleans */
+}
+
+.json-null {
+  color: #ff7b72; /* Salmon red for null */
+}
+
+.json-bracket {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.json-comma {
+  color: #c9d1d9;
+}
+
+/* Expand / Collapse All buttons */
+.btn-json-action {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-sans);
+  margin-right: 6px;
+}
+
+.btn-json-action:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-bright);
+  border-color: var(--text-muted);
+}
+
