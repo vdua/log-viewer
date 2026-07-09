@@ -166,6 +166,40 @@ async function loadApps() {
   }
 }
 
+function getUniqueWorkspaceNames(paths) {
+  const pathSegments = paths.map(p => ({
+    original: p,
+    segments: p.split('/').filter(Boolean)
+  }));
+
+  const results = {};
+  for (const item of pathSegments) {
+    let k = 1;
+    let suffix = '';
+    let start = 0;
+    while (true) {
+      start = Math.max(0, item.segments.length - k);
+      suffix = item.segments.slice(start).join('/');
+      if (start === 0) break;
+
+      let isUnique = true;
+      for (const other of pathSegments) {
+        if (other.original === item.original) continue;
+        const otherStart = Math.max(0, other.segments.length - k);
+        const otherSuffix = other.segments.slice(otherStart).join('/');
+        if (suffix === otherSuffix) {
+          isUnique = false;
+          break;
+        }
+      }
+      if (isUnique) break;
+      k++;
+    }
+    results[item.original] = (start === 0) ? item.original : suffix;
+  }
+  return results;
+}
+
 function renderApps() {
   if (state.apps.length === 0) {
     el.appList.innerHTML = `
@@ -175,6 +209,8 @@ function renderApps() {
     `;
     return;
   }
+
+  const uniqueNames = getUniqueWorkspaceNames(state.apps);
 
   el.appList.innerHTML = state.apps.map((app, index) => {
     const isActive = app === state.activeApp;
@@ -197,7 +233,7 @@ function renderApps() {
         <div class="app-item-info">
           <div style="display: flex; align-items: center; gap: 8px;">
             ${isActive ? '<span class="app-badge">Active</span>' : ''}
-            <span class="app-path" title="${app}">${app}</span>
+            <span class="app-path" title="${app}">${uniqueNames[app]}</span>
           </div>
           <span class="app-logs-resolved" title="${resolvedLogsPath}">Logs path: ${resolvedLogsPath}</span>
         </div>
