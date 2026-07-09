@@ -16,84 +16,97 @@
     
     <!-- Screen 1: Session Selector (Clean Landing Page) -->
     <div id="screen-selector" class="screen active">
-      <div class="landing-hero">
-        <div class="logo-wrapper">
-          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <h1>Wizard Log Explorer</h1>
-        </div>
-        <p class="subtitle">Inspect and trace wizard API requests and states</p>
-      </div>
-
-      <!-- Workspace Selector Panel -->
-      <div class="app-selector-panel">
-        <div class="panel-header">
-          <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <h3>Application Workspaces</h3>
-        </div>
+      <div class="selector-layout">
         
-        <div id="app-list" class="app-list">
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading workspaces...</p>
-          </div>
-        </div>
-
-        <form id="add-app-form" class="add-app-form">
-          <div class="input-wrapper">
-            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        <!-- Left Panel: Sidebar containing App/Workspace selector -->
+        <aside class="selector-sidebar">
+          <div class="sidebar-brand">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <input type="text" id="app-path-input" placeholder="Register new application (absolute path like: /Users/username/workspace/my-app)..." required>
+            <div class="brand-text">
+              <h1>Wizard Log Explorer</h1>
+              <p class="subtitle">Inspect and trace logs</p>
+            </div>
           </div>
-          <button type="submit" class="btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>Register App</span>
-          </button>
-        </form>
-      </div>
+          
+          <!-- Workspace Selector Panel -->
+          <div class="app-selector-panel">
+            <div class="panel-header">
+              <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <h3>Application Workspaces</h3>
+            </div>
+            
+            <div id="app-list" class="app-list">
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading workspaces...</p>
+              </div>
+            </div>
 
-      <div class="search-container" style="display: flex; gap: 16px; align-items: center;">
-        <div class="search-box" style="flex-grow: 1;">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input type="text" id="dir-search" placeholder="Search log folders..." autocomplete="off">
-        </div>
-        <button id="btn-clean-all" class="btn-clean-all" title="Delete All Sessions">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-icon">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          <span>Clean All</span>
-        </button>
-      </div>
-
-      <div class="session-list-container">
-        <div class="list-header">
-          <span>Log Directory</span>
-          <span class="text-right">APIs Count</span>
-          <span class="text-right">Size</span>
-          <span>Last Modified</span>
-          <span class="text-right">Action</span>
-        </div>
-        <div id="session-list" class="session-list">
-          <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading available logs...</p>
+            <form id="add-app-form" class="add-app-form">
+              <div class="input-wrapper">
+                <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <input type="text" id="app-path-input" placeholder="Register new application path..." required>
+              </div>
+              <button type="submit" class="btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Register App</span>
+              </button>
+            </form>
           </div>
-        </div>
-        <div id="session-pagination" class="pagination-bar"></div>
+        </aside>
+
+        <!-- Right/Center Panel: Main content containing search and log directories -->
+        <main class="selector-main">
+          <div class="main-header">
+            <h2>Log Directories</h2>
+            <div class="search-container" style="display: flex; gap: 16px; align-items: center; margin-bottom: 0; flex-grow: 1; max-width: 600px;">
+              <div class="search-box" style="flex-grow: 1;">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="dir-search" placeholder="Search log folders..." autocomplete="off">
+              </div>
+            </div>
+            <button id="btn-clean-all" class="btn-clean-all" title="Delete All Sessions">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-icon">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Clean All</span>
+            </button>
+          </div>
+
+          <div class="session-list-container">
+            <div class="list-header">
+              <span>Log Directory</span>
+              <span class="text-right">APIs Count</span>
+              <span class="text-right">Size</span>
+              <span>Last Modified</span>
+              <span class="text-right">Action</span>
+            </div>
+            <div id="session-list" class="session-list">
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading available logs...</p>
+              </div>
+            </div>
+            <div id="session-pagination" class="pagination-bar"></div>
+          </div>
+        </main>
+
       </div>
     </div>
 
