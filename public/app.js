@@ -7,7 +7,9 @@ let state = {
   selectedApiId: null,
   apps: [],
   activeApp: '',
-  activeLogsDir: ''
+  activeLogsDir: '',
+  currentPage: 1,
+  pageSize: 10
 };
 
 // DOM Elements
@@ -16,6 +18,7 @@ const el = {
   screenDashboard: document.getElementById('screen-dashboard'),
   dirSearch: document.getElementById('dir-search'),
   sessionList: document.getElementById('session-list'),
+  sessionPagination: document.getElementById('session-pagination'),
   
   btnBack: document.getElementById('btn-back'),
   activeSessionName: document.getElementById('active-session-name'),
@@ -60,7 +63,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function initEventListeners() {
   // Screen 1: Search Directories & Clean All
-  el.dirSearch.addEventListener('input', renderSessions);
+  el.dirSearch.addEventListener('input', () => {
+    state.currentPage = 1;
+    renderSessions();
+  });
   if (el.btnCleanAll) {
     el.btnCleanAll.addEventListener('click', cleanAllSessions);
   }
@@ -148,6 +154,7 @@ async function loadApps() {
     state.activeApp = data.activeApp || '';
     state.activeLogsDir = data.activeLogsDir || '';
     renderApps();
+    state.currentPage = 1;
     await loadSessions();
   } catch (err) {
     console.error('Failed to load apps:', err);
@@ -303,16 +310,37 @@ function renderSessions() {
   const query = el.dirSearch.value.trim().toLowerCase();
   const filtered = state.sessions.filter(s => s.name.toLowerCase().includes(query));
   
+  // Sort by time (latest up / descending)
+  filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  
   if (filtered.length === 0) {
     el.sessionList.innerHTML = `
       <div class="empty-state">
         <p>No log directories found${query ? ' matching search' : ''}.</p>
       </div>
     `;
+    if (el.sessionPagination) {
+      el.sessionPagination.innerHTML = '';
+    }
     return;
   }
   
-  el.sessionList.innerHTML = filtered.map(s => {
+  // Paginate
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / state.pageSize);
+  
+  if (state.currentPage > totalPages) {
+    state.currentPage = totalPages;
+  }
+  if (state.currentPage < 1) {
+    state.currentPage = 1;
+  }
+  
+  const startIndex = (state.currentPage - 1) * state.pageSize;
+  const endIndex = Math.min(startIndex + state.pageSize, totalItems);
+  const paginated = filtered.slice(startIndex, endIndex);
+  
+  el.sessionList.innerHTML = paginated.map(s => {
     const dateStr = new Date(s.createdAt).toLocaleString();
     const sizeStr = s.sizeBytes >= 1024 * 1024 
       ? `${(s.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
@@ -343,6 +371,9 @@ function renderSessions() {
     `;
   }).join('');
   
+  // Render pagination bar
+  renderPaginationBar(totalItems, totalPages);
+  
   // Attach select handlers
   el.sessionList.querySelectorAll('.session-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -368,6 +399,7 @@ function showSessionSelector() {
   state.apis = [];
   state.bodies = {};
   state.selectedApiId = null;
+  state.currentPage = 1;
   
   el.screenDashboard.classList.remove('active');
   el.screenSelector.classList.add('active');
@@ -919,3 +951,59 @@ function renderJsonToElement(val, containerEl) {
   const tree = buildJsonTreeDOM(val, true);
   containerEl.appendChild(tree);
 }
+
+function renderPaginationBar(totalItems, totalPages) {
+  if (!el.sessionPagination) return;
+  
+  if (totalPages <= 1) {
+    el.sessionPagination.innerHTML = '';
+    return;
+  }
+  
+  const startEntry = (state.currentPage - 1) * state.pageSize + 1;
+  const endEntry = Math.min(startEntry + state.pageSize - 1, totalItems);
+  
+  el.sessionPagination.innerHTML = `
+    <div class="pagination-info">
+      Showing <span class="highlight">${startEntry}</span> to <span class="highlight">${endEntry}</span> of <span class="highlight">${totalItems}</span> directories
+    </div>
+    <div class="pagination-buttons">
+      <button class="btn-pagination" id="btn-prev" ${state.currentPage === 1 ? 'disabled' : ''}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span>Prev</span>
+      </button>
+      <span class="pagination-current">Page ${state.currentPage} of ${totalPages}</span>
+      <button class="btn-pagination" id="btn-next" ${state.currentPage === totalPages ? 'disabled' : ''}>
+        <span>Next</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  // Attach listeners
+  const btnPrev = document.getElementById('btn-prev');
+  const btnNext = document.getElementById('btn-next');
+  
+  if (btnPrev) {
+    btnPrev.addEventListener('click', () => {
+      if (state.currentPage > 1) {
+        state.currentPage--;
+        renderSessions();
+      }
+    });
+  }
+  
+  if (btnNext) {
+    btnNext.addEventListener('click', () => {
+      if (state.currentPage < totalPages) {
+        state.currentPage++;
+        renderSessions();
+      }
+    });
+  }
+}
+
