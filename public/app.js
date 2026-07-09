@@ -8,8 +8,7 @@ let state = {
   apps: [],
   activeApp: '',
   activeLogsDir: '',
-  currentPage: 1,
-  pageSize: 10
+  visibleItemsCount: 20
 };
 
 // DOM Elements
@@ -64,11 +63,26 @@ window.addEventListener('DOMContentLoaded', () => {
 function initEventListeners() {
   // Screen 1: Search Directories & Clean All
   el.dirSearch.addEventListener('input', () => {
-    state.currentPage = 1;
+    state.visibleItemsCount = 20;
     renderSessions();
   });
   if (el.btnCleanAll) {
     el.btnCleanAll.addEventListener('click', cleanAllSessions);
+  }
+  
+  // Infinite Scroll scroll listener on the session list container
+  if (el.sessionList) {
+    el.sessionList.addEventListener('scroll', () => {
+      const { scrollTop, scrollHeight, clientHeight } = el.sessionList;
+      if (scrollHeight - scrollTop - clientHeight < 40) {
+        const query = el.dirSearch.value.trim().toLowerCase();
+        const filteredCount = state.sessions.filter(s => s.name.toLowerCase().includes(query)).length;
+        if (state.visibleItemsCount < filteredCount) {
+          state.visibleItemsCount += 20;
+          renderSessions();
+        }
+      }
+    });
   }
   
   // Header: Go Back
@@ -154,7 +168,7 @@ async function loadApps() {
     state.activeApp = data.activeApp || '';
     state.activeLogsDir = data.activeLogsDir || '';
     renderApps();
-    state.currentPage = 1;
+    state.visibleItemsCount = 20;
     await loadSessions();
   } catch (err) {
     console.error('Failed to load apps:', err);
@@ -346,70 +360,145 @@ function renderSessions() {
   const query = el.dirSearch.value.trim().toLowerCase();
   const filtered = state.sessions.filter(s => s.name.toLowerCase().includes(query));
   
-  // Sort by time (latest up / descending)
-  filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
   if (filtered.length === 0) {
     el.sessionList.innerHTML = `
       <div class="empty-state">
         <p>No log directories found${query ? ' matching search' : ''}.</p>
       </div>
     `;
-    if (el.sessionPagination) {
-      el.sessionPagination.innerHTML = '';
-    }
     return;
   }
+
+  // Parse and categorize
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   
-  // Paginate
-  const totalItems = filtered.length;
-  const totalPages = Math.ceil(totalItems / state.pageSize);
-  
-  if (state.currentPage > totalPages) {
-    state.currentPage = totalPages;
-  }
-  if (state.currentPage < 1) {
-    state.currentPage = 1;
-  }
-  
-  const startIndex = (state.currentPage - 1) * state.pageSize;
-  const endIndex = Math.min(startIndex + state.pageSize, totalItems);
-  const paginated = filtered.slice(startIndex, endIndex);
-  
-  el.sessionList.innerHTML = paginated.map(s => {
-    const dateStr = new Date(s.createdAt).toLocaleString();
-    const sizeStr = s.sizeBytes >= 1024 * 1024 
-      ? `${(s.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
-      : `${(s.sizeBytes / 1024).toFixed(2)} KB`;
+  const categorized = filtered.map(s => {
+    const match = s.name.match(/^network-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const year = match[1];
+      const monthStr = match[2];
+      const dayStr = match[3];
+      const hour = match[4];
+      const minute = match[5];
+      const second = match[6];
+      
+      const mIdx = parseInt(monthStr, 10) - 1;
+      const monthName = monthNames[mIdx] || monthStr;
+      const day = parseInt(dayStr, 10);
+      
+      return {
+        session: s,
+        isStandard: true,
+        dateKey: `${monthStr}-${dayStr}`, // For sorting (e.g. "07-09")
+        dateDisplay: `${monthName} ${day}`,
+        timeDisplay: `${hour}:${minute}:${second}`,
+        timestampSort: `${hour}-${minute}-${second}`
+      };
+    } else {
+      return {
+        session: s,
+        isStandard: false,
+        dateKey: 'Others',
+        dateDisplay: 'Others',
+        timeDisplay: s.name,
+        timestampSort: s.name
+      };
+    }
+  });
+
+  // Group by dateKey
+  const groups = {};
+  categorized.forEach(item => {
+    const key = item.dateKey;
+    if (!groups[key]) {
+      groups[key] = {
+        key: key,
+        display: item.dateDisplay,
+        items: []
+      };
+    }
+    groups[key].items.push(item);
+  });
+
+  // Sort groups: Standard dates descending, "Others" always at the end
+  const sortedGroupKeys = Object.keys(groups).sort((a, b) => {
+    if (a === 'Others') return 1;
+    if (b === 'Others') return -1;
+    // Compare Month-Day strings descending
+    return b.localeCompare(a);
+  });
+
+  // Sort items within each group
+  sortedGroupKeys.forEach(key => {
+    const group = groups[key];
+    if (key === 'Others') {
+      group.items.sort((a, b) => new Date(b.session.createdAt) - new Date(a.session.createdAt));
+    } else {
+      group.items.sort((a, b) => b.timestampSort.localeCompare(a.timestampSort));
+    }
+  });
+
+  // Infinite Scroll Slice: We want to only show state.visibleItemsCount sessions in total
+  let sessionCounter = 0;
+  let html = '';
+
+  for (const key of sortedGroupKeys) {
+    const group = groups[key];
+    const groupItems = [];
     
-    return `
-      <div class="session-item" data-name="${s.name}">
-        <div class="session-name-cell">
-          <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <div>
-            <div class="session-title">${s.name}</div>
+    for (const item of group.items) {
+      if (sessionCounter >= state.visibleItemsCount) {
+        break;
+      }
+      groupItems.push(item);
+      sessionCounter++;
+    }
+
+    if (groupItems.length > 0) {
+      // Render group header
+      html += `<div class="session-group-header">${group.display}</div>`;
+      
+      // Render group items
+      html += groupItems.map(item => {
+        const s = item.session;
+        const sizeStr = s.sizeBytes >= 1024 * 1024 
+          ? `${(s.sizeBytes / (1024 * 1024)).toFixed(2)} MB`
+          : `${(s.sizeBytes / 1024).toFixed(2)} KB`;
+        const mDateStr = new Date(s.createdAt).toLocaleString();
+        
+        return `
+          <div class="session-item" data-name="${s.name}">
+            <div class="session-name-cell">
+              <svg class="folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <div>
+                <div class="session-title">${item.timeDisplay}</div>
+              </div>
+            </div>
+            <div class="text-right">${s.totalApis} calls</div>
+            <div class="text-right">${sizeStr}</div>
+            <div class="session-meta">${mDateStr}</div>
+            <div class="action-cell">
+              <button class="btn-delete-session" data-name="${s.name}" title="Delete Session">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-icon">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="text-right">${s.totalApis} calls</div>
-        <div class="text-right">${sizeStr}</div>
-        <div class="session-meta">${dateStr}</div>
-        <div class="action-cell">
-          <button class="btn-delete-session" data-name="${s.name}" title="Delete Session">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-icon">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  // Render pagination bar
-  renderPaginationBar(totalItems, totalPages);
-  
+        `;
+      }).join('');
+    }
+
+    if (sessionCounter >= state.visibleItemsCount) {
+      break;
+    }
+  }
+
+  el.sessionList.innerHTML = html;
+
   // Attach select handlers
   el.sessionList.querySelectorAll('.session-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -435,7 +524,7 @@ function showSessionSelector() {
   state.apis = [];
   state.bodies = {};
   state.selectedApiId = null;
-  state.currentPage = 1;
+  state.visibleItemsCount = 20;
   
   el.screenDashboard.classList.remove('active');
   el.screenSelector.classList.add('active');
@@ -986,60 +1075,5 @@ function renderJsonToElement(val, containerEl) {
 
   const tree = buildJsonTreeDOM(val, true);
   containerEl.appendChild(tree);
-}
-
-function renderPaginationBar(totalItems, totalPages) {
-  if (!el.sessionPagination) return;
-  
-  if (totalPages <= 1) {
-    el.sessionPagination.innerHTML = '';
-    return;
-  }
-  
-  const startEntry = (state.currentPage - 1) * state.pageSize + 1;
-  const endEntry = Math.min(startEntry + state.pageSize - 1, totalItems);
-  
-  el.sessionPagination.innerHTML = `
-    <div class="pagination-info">
-      Showing <span class="highlight">${startEntry}</span> to <span class="highlight">${endEntry}</span> of <span class="highlight">${totalItems}</span> directories
-    </div>
-    <div class="pagination-buttons">
-      <button class="btn-pagination" id="btn-prev" ${state.currentPage === 1 ? 'disabled' : ''}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-        <span>Prev</span>
-      </button>
-      <span class="pagination-current">Page ${state.currentPage} of ${totalPages}</span>
-      <button class="btn-pagination" id="btn-next" ${state.currentPage === totalPages ? 'disabled' : ''}>
-        <span>Next</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </button>
-    </div>
-  `;
-  
-  // Attach listeners
-  const btnPrev = document.getElementById('btn-prev');
-  const btnNext = document.getElementById('btn-next');
-  
-  if (btnPrev) {
-    btnPrev.addEventListener('click', () => {
-      if (state.currentPage > 1) {
-        state.currentPage--;
-        renderSessions();
-      }
-    });
-  }
-  
-  if (btnNext) {
-    btnNext.addEventListener('click', () => {
-      if (state.currentPage < totalPages) {
-        state.currentPage++;
-        renderSessions();
-      }
-    });
-  }
 }
 
