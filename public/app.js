@@ -36,6 +36,7 @@ const el = {
   inspectMethod: document.getElementById('inspect-method'),
   inspectPath: document.getElementById('inspect-path'),
   inspectStatus: document.getElementById('inspect-status'),
+  btnDownloadHar: document.getElementById('btn-download-har'),
   
   // Content blocks
   sectionState: document.getElementById('section-state'),
@@ -90,6 +91,11 @@ function initEventListeners() {
   
   // Top-level payload filtering
   el.topPayloadSearch.addEventListener('input', applyTopPayloadSearch);
+  
+  // Download HAR
+  if (el.btnDownloadHar) {
+    el.btnDownloadHar.addEventListener('click', handleDownloadHar);
+  }
   
   // Workspace Manager: Submit new app
   if (el.addAppForm) {
@@ -1075,5 +1081,112 @@ function renderJsonToElement(val, containerEl) {
 
   const tree = buildJsonTreeDOM(val, true);
   containerEl.appendChild(tree);
+}
+
+function handleDownloadHar() {
+  const api = state.apis.find(a => a.id === state.selectedApiId);
+  const bodies = state.bodies[state.selectedApiId];
+  if (!api || !bodies) return;
+  downloadHar(api, bodies);
+}
+
+function downloadHar(api, bodies) {
+  if (!api || !bodies) return;
+
+  const url = api.path.startsWith('http') 
+    ? api.path 
+    : `${window.location.protocol}//${window.location.host}${api.path}`;
+
+  const reqBodyText = bodies.req ? JSON.stringify(bodies.req, null, 2) : '';
+  const resBodyText = bodies.res ? JSON.stringify(bodies.res, null, 2) : '';
+
+  const har = {
+    log: {
+      version: "1.2",
+      creator: {
+        name: "Wizard Log Explorer",
+        version: "1.0.0"
+      },
+      entries: [
+        {
+          startedDateTime: new Date().toISOString(),
+          time: 0,
+          request: {
+            method: api.method,
+            url: url,
+            httpVersion: "HTTP/1.1",
+            headers: [
+              { name: "Content-Type", value: "application/json" }
+            ],
+            queryString: [],
+            cookies: [],
+            headersSize: -1,
+            bodySize: reqBodyText.length,
+            postData: reqBodyText ? {
+              mimeType: "application/json",
+              text: reqBodyText
+            } : undefined
+          },
+          response: {
+            status: api.status,
+            statusText: getStatusText(api.status),
+            httpVersion: "HTTP/1.1",
+            headers: [
+              { name: "Content-Type", value: "application/json" }
+            ],
+            cookies: [],
+            content: {
+              size: resBodyText.length,
+              mimeType: "application/json",
+              text: resBodyText
+            },
+            redirectURL: "",
+            headersSize: -1,
+            bodySize: resBodyText.length
+          },
+          cache: {},
+          timings: {
+            send: 0,
+            wait: 0,
+            receive: 0
+          }
+        }
+      ]
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(har, null, 2)], { type: 'application/json' });
+  const downloadUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  
+  const pathClean = api.path.split('?')[0].replace(/[^a-zA-Z0-9]/g, '_');
+  a.download = `api_${api.id}_${pathClean}.har`;
+  
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(downloadUrl);
+}
+
+function getStatusText(status) {
+  const statusTexts = {
+    200: "OK",
+    201: "Created",
+    202: "Accepted",
+    204: "No Content",
+    301: "Moved Permanently",
+    302: "Found",
+    304: "Not Modified",
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    405: "Method Not Allowed",
+    500: "Internal Server Error",
+    502: "Bad Gateway",
+    503: "Service Unavailable"
+  };
+  return statusTexts[status] || "Unknown";
 }
 
