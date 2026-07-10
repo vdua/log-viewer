@@ -22,6 +22,7 @@ const el = {
   btnBack: document.getElementById('btn-back'),
   activeSessionName: document.getElementById('active-session-name'),
   topPayloadSearch: document.getElementById('top-payload-search'),
+  btnDownloadSessionHar: document.getElementById('btn-download-session-har'),
   
   stat200: document.getElementById('stat-200'),
   stat500: document.getElementById('stat-500'),
@@ -95,6 +96,11 @@ function initEventListeners() {
   // Download HAR
   if (el.btnDownloadHar) {
     el.btnDownloadHar.addEventListener('click', handleDownloadHar);
+  }
+
+  // Download Session HAR
+  if (el.btnDownloadSessionHar) {
+    el.btnDownloadSessionHar.addEventListener('click', handleDownloadSessionHar);
   }
   
   // Workspace Manager: Submit new app
@@ -1188,5 +1194,85 @@ function getStatusText(status) {
     503: "Service Unavailable"
   };
   return statusTexts[status] || "Unknown";
+}
+
+function handleDownloadSessionHar() {
+  if (!state.selectedSession || state.apis.length === 0) return;
+
+  const entries = state.apis.map(api => {
+    const bodies = state.bodies[api.id] || { req: null, res: null };
+    const url = api.path.startsWith('http') 
+      ? api.path 
+      : `${window.location.protocol}//${window.location.host}${api.path}`;
+
+    const reqBodyText = bodies.req ? JSON.stringify(bodies.req, null, 2) : '';
+    const resBodyText = bodies.res ? JSON.stringify(bodies.res, null, 2) : '';
+
+    return {
+      startedDateTime: new Date().toISOString(),
+      time: 0,
+      request: {
+        method: api.method,
+        url: url,
+        httpVersion: "HTTP/1.1",
+        headers: [
+          { name: "Content-Type", value: "application/json" }
+        ],
+        queryString: [],
+        cookies: [],
+        headersSize: -1,
+        bodySize: reqBodyText.length,
+        postData: reqBodyText ? {
+          mimeType: "application/json",
+          text: reqBodyText
+        } : undefined
+      },
+      response: {
+        status: api.status,
+        statusText: getStatusText(api.status),
+        httpVersion: "HTTP/1.1",
+        headers: [
+          { name: "Content-Type", value: "application/json" }
+        ],
+        cookies: [],
+        content: {
+          size: resBodyText.length,
+          mimeType: "application/json",
+          text: resBodyText
+        },
+        redirectURL: "",
+        headersSize: -1,
+        bodySize: resBodyText.length
+      },
+      cache: {},
+      timings: {
+        send: 0,
+        wait: 0,
+        receive: 0
+      }
+    };
+  });
+
+  const har = {
+    log: {
+      version: "1.2",
+      creator: {
+        name: "Wizard Log Explorer",
+        version: "1.0.0"
+      },
+      entries: entries
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(har, null, 2)], { type: 'application/json' });
+  const downloadUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = `session_${state.selectedSession}.har`;
+  
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(downloadUrl);
 }
 
