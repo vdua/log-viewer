@@ -384,10 +384,11 @@ app.post('/api/logs/import-har', (req, res) => {
         extraInfo += ` | Mobile: ${mobile}`;
       }
 
-      // Try to find state
+      // Try to find state safely
+      const resJourneyStateInfo = resPayload?.formData?.journeyStateInfo;
       const stateVal = reqPayload?.formData?.journeyStateInfo?.[0]?.state || 
                        resPayload?.formData?.journeyStateInfo?.[0]?.state ||
-                       resPayload?.formData?.journeyStateInfo?.[resPayload.formData.journeyStateInfo.length - 1]?.state;
+                       (Array.isArray(resJourneyStateInfo) && resJourneyStateInfo.length > 0 ? resJourneyStateInfo[resJourneyStateInfo.length - 1]?.state : null);
       if (stateVal) {
         extraInfo += ` | State: ${stateVal}`;
       }
