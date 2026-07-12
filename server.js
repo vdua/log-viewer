@@ -5,8 +5,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Enable JSON body parsing
-app.use(express.json());
+// Enable JSON body parsing with large limit for HAR files
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Resolve default application path from environment variable
 const DEFAULT_APP_PATH = process.env.DEFAULT_APP ? path.resolve(process.env.DEFAULT_APP) : (process.env.LOGS_DIR ? path.resolve(process.env.LOGS_DIR) : __dirname);
@@ -297,6 +298,115 @@ app.get('/api/logs', (req, res) => {
   } catch (err) {
     console.error('Error listing log directories:', err);
     res.status(500).json({ error: 'Failed to read log directories' });
+  }
+});
+
+// Endpoint: Import a HAR file as a log session
+app.post('/api/logs/import-har', (req, res) => {
+  try {
+    const { filename, harData } = req.body;
+    if (!harData || !harData.log || !Array.isArray(harData.log.entries)) {
+      return res.status(400).json({ error: 'Invalid HAR data structure' });
+    }
+
+    const entries = harData.log.entries;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+    
+    // Create safe session name
+    const sanitizedFilename = (filename || 'import')
+      .replace(/\.har$/i, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 30);
+    const sessionName = `${sanitizedFilename}-${timestamp}`;
+
+    const activeLogsDir = getActiveLogsDir();
+    const dirPath = path.join(activeLogsDir, sessionName);
+
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+
+    const indexLines = [];
+    const bodiesObj = {};
+    let index = 1;
+
+    for (const entry of entries) {
+      const request = entry.request;
+      const response = entry.response;
+      if (!request || !response) continue;
+
+      let urlPath = '';
+      try {
+        const parsedUrl = new URL(request.url);
+        urlPath = parsedUrl.pathname + parsedUrl.search;
+      } catch (e) {
+        urlPath = request.url || '/unknown-url';
+      }
+
+      const method = request.method || 'GET';
+      const status = response.status || 200;
+
+      // Extract request body
+      let reqBody = null;
+      if (request.postData && request.postData.text) {
+        try {
+          reqBody = JSON.parse(request.postData.text);
+        } catch (e) {
+          reqBody = request.postData.text;
+        }
+      }
+
+      // Extract response body
+      let resBody = null;
+      if (response.content && response.content.text) {
+        try {
+          resBody = JSON.parse(response.content.text);
+        } catch (e) {
+          resBody = response.content.text;
+        }
+      }
+
+      bodiesObj[String(index)] = {
+        req: reqBody,
+        res: resBody
+      };
+
+      // Format description/extraInfo column
+      let extraInfo = 'HAR-Import';
+      const reqPayload = reqBody?.RequestPayload || reqBody;
+      const resPayload = resBody;
+
+      // Try to find mobile number
+      const mobile = reqPayload?.leadProfile?.mobileNumber || reqPayload?.formData?.mobileNumber;
+      if (mobile) {
+        extraInfo += ` | Mobile: ${mobile}`;
+      }
+
+      // Try to find state
+      const stateVal = reqPayload?.formData?.journeyStateInfo?.[0]?.state || 
+                       resPayload?.formData?.journeyStateInfo?.[0]?.state ||
+                       resPayload?.formData?.journeyStateInfo?.[resPayload.formData.journeyStateInfo.length - 1]?.state;
+      if (stateVal) {
+        extraInfo += ` | State: ${stateVal}`;
+      }
+
+      indexLines.push(`${index} ${method} ${urlPath} ${status} ${extraInfo}`);
+      index++;
+    }
+
+    fs.writeFileSync(path.join(dirPath, 'index.ndjson'), indexLines.join('\n') + '\n', 'utf8');
+    fs.writeFileSync(path.join(dirPath, 'bodies.json'), JSON.stringify(bodiesObj, null, 2), 'utf8');
+
+    res.json({
+      success: true,
+      sessionName,
+      totalApis: index - 1
+    });
+  } catch (err) {
+    console.error('Error importing HAR file:', err);
+    res.status(500).json({ error: 'Failed to import HAR file: ' + err.message });
   }
 });
 

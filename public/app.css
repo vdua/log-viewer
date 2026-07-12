@@ -959,6 +959,33 @@ mark.json-highlight {
   height: 14px;
 }
 
+.btn-import-har {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(56, 139, 253, 0.12);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-blue);
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  margin-right: 12px;
+}
+
+.btn-import-har:hover {
+  background-color: var(--accent-blue);
+  color: var(--bg-app);
+}
+
+.btn-import-har svg {
+  width: 14px;
+  height: 14px;
+}
+
 .action-cell {
   display: flex;
   justify-content: flex-end;

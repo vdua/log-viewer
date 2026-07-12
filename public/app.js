@@ -16,6 +16,8 @@ const el = {
   screenSelector: document.getElementById('screen-selector'),
   screenDashboard: document.getElementById('screen-dashboard'),
   dirSearch: document.getElementById('dir-search'),
+  btnImportHar: document.getElementById('btn-import-har'),
+  harFileInput: document.getElementById('har-file-input'),
   sessionList: document.getElementById('session-list'),
   sessionPagination: document.getElementById('session-pagination'),
   
@@ -72,6 +74,15 @@ function initEventListeners() {
   });
   if (el.btnCleanAll) {
     el.btnCleanAll.addEventListener('click', cleanAllSessions);
+  }
+
+  if (el.btnImportHar) {
+    el.btnImportHar.addEventListener('click', () => {
+      el.harFileInput.click();
+    });
+  }
+  if (el.harFileInput) {
+    el.harFileInput.addEventListener('change', handleImportHar);
   }
   
   // Infinite Scroll scroll listener on the session list container
@@ -586,6 +597,64 @@ async function cleanAllSessions() {
       alert('Failed to clean all sessions. Server error.');
     }
   }
+}
+
+async function handleImportHar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const text = event.target.result;
+      const harData = JSON.parse(text);
+
+      if (!harData.log || !Array.isArray(harData.log.entries)) {
+        alert('Invalid HAR file: Missing log entries');
+        return;
+      }
+
+      // Show loading state in session list
+      el.sessionList.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Parsing and importing HAR session...</p>
+        </div>
+      `;
+
+      const response = await fetch('/api/logs/import-har', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          harData
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        el.harFileInput.value = '';
+        await loadSessions();
+        
+        // Enter the newly imported session
+        const session = state.sessions.find(s => s.name === result.sessionName);
+        if (session) {
+          selectSession(session.name);
+        } else {
+          renderSessions();
+        }
+      } else {
+        alert('Failed to import HAR: ' + (result.error || 'Unknown error'));
+        loadSessions();
+      }
+    } catch (err) {
+      alert('Error parsing HAR file: ' + err.message);
+      loadSessions();
+    }
+  };
+  reader.readAsText(file);
 }
 
 // --- SCREEN 2 & 3: DASHBOARD ---
