@@ -385,25 +385,30 @@ function renderSessions() {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   
   const categorized = filtered.map(s => {
-    const match = s.name.match(/^network-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+    const match = s.name.match(/^(?:(.*)-)?network-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
     if (match) {
-      const year = match[1];
-      const monthStr = match[2];
-      const dayStr = match[3];
-      const hour = match[4];
-      const minute = match[5];
-      const second = match[6];
+      const dataset = match[1];
+      const year = match[2];
+      const monthStr = match[3];
+      const dayStr = match[4];
+      const hour = match[5];
+      const minute = match[6];
+      const second = match[7];
       
       const mIdx = parseInt(monthStr, 10) - 1;
       const monthName = monthNames[mIdx] || monthStr;
       const day = parseInt(dayStr, 10);
+      
+      const timeDisplay = dataset 
+        ? `[${dataset}] ${hour}:${minute}:${second}`
+        : `${hour}:${minute}:${second}`;
       
       return {
         session: s,
         isStandard: true,
         dateKey: `${monthStr}-${dayStr}`, // For sorting (e.g. "07-09")
         dateDisplay: `${monthName} ${day}`,
-        timeDisplay: `${hour}:${minute}:${second}`,
+        timeDisplay: timeDisplay,
         timestampSort: `${hour}-${minute}-${second}`
       };
     } else {
