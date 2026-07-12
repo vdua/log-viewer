@@ -42,6 +42,8 @@ const el = {
   // Content blocks
   sectionState: document.getElementById('section-state'),
   stateJsonContent: document.getElementById('state-json-content'),
+  sectionTimeline: document.getElementById('section-timeline'),
+  timelineStepsList: document.getElementById('timeline-steps-list'),
   reqJsonContent: document.getElementById('req-json-content'),
   resJsonContent: document.getElementById('res-json-content'),
   
@@ -661,6 +663,22 @@ function hasStateInfo(id) {
   return !!(findStateInfo(payload.req) || findStateInfo(payload.res));
 }
 
+// Helper: get state name for journeydropoffupdate.json (sent in request)
+function getUpdateApiState(id) {
+  const payload = state.bodies[id];
+  if (!payload || !payload.req) return null;
+  const info = payload.req.RequestPayload?.formData?.journeyStateInfo?.[0];
+  return info ? info.state : null;
+}
+
+// Helper: get states list for journeydropoffparam.json (received in response)
+function getParamApiStates(id) {
+  const payload = state.bodies[id];
+  if (!payload || !payload.res) return [];
+  const infoList = payload.res.formData?.journeyStateInfo || [];
+  return infoList.map(item => item.state).filter(Boolean);
+}
+
 function renderApiList(apisToRender = state.apis) {
   if (apisToRender.length === 0) {
     el.apiList.innerHTML = `<div class="empty-state"><p>No matching API calls in this log.</p></div>`;
@@ -671,7 +689,25 @@ function renderApiList(apisToRender = state.apis) {
     const statusClass = api.status >= 500 ? 'red' : (api.status >= 400 ? 'orange' : 'green');
     const lastName = api.path.split('?')[0].split('/').pop();
     const isStateCall = hasStateInfo(api.id);
-    const stateLabel = isStateCall ? `<span class="state-badge">State</span>` : '';
+    
+    let stateLabel = '';
+    if (api.path.includes('journeydropoffupdate.json')) {
+      const updateState = getUpdateApiState(api.id);
+      if (updateState) {
+        stateLabel = `<span class="state-badge update-state-badge" title="${updateState}">${updateState}</span>`;
+      } else {
+        stateLabel = isStateCall ? `<span class="state-badge">State</span>` : '';
+      }
+    } else if (api.path.includes('journeydropoffparam.json')) {
+      const paramStates = getParamApiStates(api.id);
+      if (paramStates.length > 0) {
+        stateLabel = `<span class="state-badge param-state-badge" title="${paramStates.join(', ')}">${paramStates.length} States</span>`;
+      } else {
+        stateLabel = isStateCall ? `<span class="state-badge">State</span>` : '';
+      }
+    } else {
+      stateLabel = isStateCall ? `<span class="state-badge">State</span>` : '';
+    }
     
     return `
       <div class="api-item" data-id="${api.id}">
@@ -748,18 +784,63 @@ function renderInspector() {
   renderJsonToElement(bodies.res, el.resJsonContent);
   el.resJsonContent.dataset.raw = resStr;
   
-  // Extract and render stateInfo if it exists
-  const stateInfo = findStateInfo(bodies.req) || findStateInfo(bodies.res);
-  if (stateInfo) {
-    el.sectionState.style.display = 'block';
-    el.sectionState.classList.remove('collapsed'); // ensure open when new data loads
-    const stateStr = JSON.stringify(stateInfo, null, 2);
-    renderJsonToElement(stateInfo, el.stateJsonContent);
-    el.stateJsonContent.dataset.raw = stateStr;
+  // We no longer show the old raw wizard state section (wizard state info is not required)
+  el.sectionState.style.display = 'none';
+  el.stateJsonContent.innerHTML = '';
+  el.stateJsonContent.dataset.raw = '';
+
+  // Render Timeline/Stepper for journeydropoffparam
+  if (api.path.includes('journeydropoffparam.json')) {
+    const paramStates = getParamApiStates(api.id); // array of state strings
+    const journeyStateInfo = bodies.res?.formData?.journeyStateInfo || [];
+    
+    if (paramStates.length > 0) {
+      el.sectionTimeline.style.display = 'block';
+      el.sectionTimeline.classList.remove('collapsed');
+      
+      // Render steps inside timelineStepsList
+      el.timelineStepsList.innerHTML = paramStates.map((stateName, index) => {
+        const stepNum = index + 1;
+        let timeLabel = '';
+        const item = journeyStateInfo[index];
+        if (item && item.timeinfo) {
+          try {
+            const date = new Date(item.timeinfo);
+            timeLabel = date.toTimeString().split(' ')[0];
+          } catch(e) {
+            timeLabel = '';
+          }
+        }
+        return `
+          <div class="timeline-step" data-index="${index}" title="${stateName}">
+            <div class="timeline-step-node">${stepNum}</div>
+            <div class="timeline-step-label">${stateName}</div>
+            ${timeLabel ? `<div class="timeline-step-time">${timeLabel}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+      
+      // Add click handlers to each step to expand only that state in the response/request payloads
+      el.timelineStepsList.querySelectorAll('.timeline-step').forEach(stepEl => {
+        stepEl.addEventListener('click', () => {
+          // Remove active class from all other steps, add to this one
+          el.timelineStepsList.querySelectorAll('.timeline-step').forEach(s => s.classList.remove('active'));
+          stepEl.classList.add('active');
+          
+          const index = parseInt(stepEl.getAttribute('data-index'), 10);
+          
+          // Expand state in both request and response payload JSON trees if found
+          expandStateNodeAtIndex(el.reqJsonContent, index);
+          expandStateNodeAtIndex(el.resJsonContent, index);
+        });
+      });
+    } else {
+      el.sectionTimeline.style.display = 'none';
+      el.timelineStepsList.innerHTML = '';
+    }
   } else {
-    el.sectionState.style.display = 'none';
-    el.stateJsonContent.innerHTML = '';
-    el.stateJsonContent.dataset.raw = '';
+    el.sectionTimeline.style.display = 'none';
+    el.timelineStepsList.innerHTML = '';
   }
 
   // Render Screenshot if present
@@ -771,6 +852,50 @@ function renderInspector() {
     el.sectionScreenshot.style.display = 'none';
     el.screenshotImage.src = '';
   }
+}
+
+// Helper: Find the journeyStateInfo node and expand only the target state index, collapse others
+function expandStateNodeAtIndex(containerEl, index) {
+  if (!containerEl) return;
+  const keySpans = Array.from(containerEl.querySelectorAll('.json-key'));
+  const stateInfoKeySpan = keySpans.find(span => span.textContent.includes('journeyStateInfo'));
+  if (!stateInfoKeySpan) return;
+
+  const stateInfoNode = stateInfoKeySpan.parentElement;
+  if (!stateInfoNode) return;
+
+  stateInfoNode.classList.remove('collapsed');
+
+  const childrenContainer = stateInfoNode.querySelector(':scope > .json-children');
+  if (!childrenContainer) return;
+
+  const childNodes = Array.from(childrenContainer.children).filter(node => node.classList.contains('json-node'));
+
+  childNodes.forEach((childNode, idx) => {
+    if (idx === index) {
+      childNode.classList.remove('collapsed');
+      
+      // Expand parents
+      let parent = childNode.parentElement;
+      while (parent && parent !== containerEl) {
+        if (parent.classList.contains('json-collapsible')) {
+          parent.classList.remove('collapsed');
+        }
+        parent = parent.parentElement;
+      }
+      
+      // Scroll and Highlight
+      setTimeout(() => {
+        childNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        childNode.classList.add('highlight-flash');
+        setTimeout(() => {
+          childNode.classList.remove('highlight-flash');
+        }, 1800);
+      }, 50);
+    } else {
+      childNode.classList.add('collapsed');
+    }
+  });
 }
 
 // --- PAYLOAD SEARCH AND TEXT HIGHLIGHT HANDLER ---
@@ -971,6 +1096,9 @@ function buildJsonTreeDOM(val, isLast = true, key = null) {
 
   if (isObject) {
     node.classList.add('json-collapsible');
+    if (key === 'journeyStateInfo' || key === 'stateInfo') {
+      node.classList.add('collapsed');
+    }
     
     // Add toggle icon
     const toggle = document.createElement('span');
