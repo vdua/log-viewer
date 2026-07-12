@@ -633,8 +633,18 @@ async function handleImportHar(e) {
         })
       });
 
-      const result = await response.json();
-      if (result.success) {
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.error('Failed to parse response as JSON:', responseText);
+        alert(`Server error (${response.status}): ${responseText.slice(0, 300)}`);
+        loadSessions();
+        return;
+      }
+
+      if (response.ok && result.success) {
         el.harFileInput.value = '';
         await loadSessions();
         
