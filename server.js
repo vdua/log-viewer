@@ -55,9 +55,9 @@ function saveConfig(data) {
 
 let config = loadConfig();
 
-function getActiveLogsDir() {
-  const activeApp = config.activeApp;
-  const targetDir = path.join(activeApp, 'code', 'test', 'integration', 'logs');
+function getLogsDirForApp(appPath) {
+  if (!appPath) return __dirname;
+  const targetDir = path.join(appPath, 'code', 'test', 'integration', 'logs');
   if (fs.existsSync(targetDir)) {
     try {
       const stat = fs.statSync(targetDir);
@@ -68,7 +68,11 @@ function getActiveLogsDir() {
       // Ignore
     }
   }
-  return activeApp;
+  return appPath;
+}
+
+function getActiveLogsDir() {
+  return getLogsDirForApp(config.activeApp);
 }
 
 console.log(`Initial active logs directory resolved to: ${getActiveLogsDir()}`);
@@ -78,14 +82,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve static files from active logs directory (to access screenshots and other raw files dynamically)
 app.use('/logs-static', (req, res, next) => {
-  const activeLogsDir = getActiveLogsDir();
-  express.static(activeLogsDir)(req, res, next);
+  const workspace = req.query.workspace || config.activeApp;
+  const logsDir = getLogsDirForApp(workspace);
+  express.static(logsDir)(req, res, next);
 });
 
 // Helper: Check if directory contains the required files inside active logs directory
-function isValidLogDir(dirName) {
-  const activeLogsDir = getActiveLogsDir();
-  const dirPath = path.join(activeLogsDir, dirName);
+function isValidLogDir(dirName, logsDir = getActiveLogsDir()) {
+  const dirPath = path.join(logsDir, dirName);
   try {
     const stat = fs.statSync(dirPath);
     if (!stat.isDirectory()) return false;
@@ -101,9 +105,8 @@ function isValidLogDir(dirName) {
 }
 
 // Helper: Check if it is a flat log file session
-function isFlatFileSession(sessionName) {
-  const activeLogsDir = getActiveLogsDir();
-  const filePath = path.join(activeLogsDir, `${sessionName}-api.json`);
+function isFlatFileSession(sessionName, logsDir = getActiveLogsDir()) {
+  const filePath = path.join(logsDir, `${sessionName}-api.json`);
   try {
     const stat = fs.statSync(filePath);
     return stat.isFile();
@@ -414,11 +417,12 @@ app.post('/api/logs/import-har', (req, res) => {
 // Endpoint: Get parsed API index for a folder or flat file session
 app.get('/api/logs/:folder/apis', (req, res) => {
   const { folder } = req.params;
-  const activeLogsDir = getActiveLogsDir();
+  const workspace = req.query.workspace || config.activeApp;
+  const logsDir = getLogsDirForApp(workspace);
   
-  if (isFlatFileSession(folder)) {
+  if (isFlatFileSession(folder, logsDir)) {
     try {
-      const filePath = path.join(activeLogsDir, `${folder}-api.json`);
+      const filePath = path.join(logsDir, `${folder}-api.json`);
       const content = fs.readFileSync(filePath, 'utf8');
       const data = JSON.parse(content);
       const apis = [];
@@ -437,11 +441,11 @@ app.get('/api/logs/:folder/apis', (req, res) => {
       }
 
       // Check for any associated error JSON files and append as error API calls
-      const files = fs.readdirSync(activeLogsDir);
+      const files = fs.readdirSync(logsDir);
       const errFiles = files.filter(f => f.startsWith(`${folder}-err-`) && f.endsWith('.json'));
       for (const errFile of errFiles) {
         try {
-          const errFilePath = path.join(activeLogsDir, errFile);
+          const errFilePath = path.join(logsDir, errFile);
           const errContent = fs.readFileSync(errFilePath, 'utf8');
           const errData = JSON.parse(errContent);
           
@@ -464,12 +468,12 @@ app.get('/api/logs/:folder/apis', (req, res) => {
     }
   }
 
-  if (!isValidLogDir(folder)) {
+  if (!isValidLogDir(folder, logsDir)) {
     return res.status(400).json({ error: 'Invalid or inaccessible log directory' });
   }
 
   try {
-    const ndjsonPath = path.join(activeLogsDir, folder, 'index.ndjson');
+    const ndjsonPath = path.join(logsDir, folder, 'index.ndjson');
     const content = fs.readFileSync(ndjsonPath, 'utf8');
     const lines = content.split('\n');
     const apis = [];
@@ -514,11 +518,12 @@ app.get('/api/logs/:folder/apis', (req, res) => {
 // Endpoint: Get full request/response bodies for a folder or flat file session
 app.get('/api/logs/:folder/bodies', (req, res) => {
   const { folder } = req.params;
-  const activeLogsDir = getActiveLogsDir();
+  const workspace = req.query.workspace || config.activeApp;
+  const logsDir = getLogsDirForApp(workspace);
 
-  if (isFlatFileSession(folder)) {
+  if (isFlatFileSession(folder, logsDir)) {
     try {
-      const filePath = path.join(activeLogsDir, `${folder}-api.json`);
+      const filePath = path.join(logsDir, `${folder}-api.json`);
       const content = fs.readFileSync(filePath, 'utf8');
       const data = JSON.parse(content);
       const bodies = {};
@@ -537,16 +542,16 @@ app.get('/api/logs/:folder/bodies', (req, res) => {
       }
 
       // Check for any associated error JSON files and capture their payloads & screenshots
-      const files = fs.readdirSync(activeLogsDir);
+      const files = fs.readdirSync(logsDir);
       const errFiles = files.filter(f => f.startsWith(`${folder}-err-`) && f.endsWith('.json'));
       for (const errFile of errFiles) {
         try {
-          const errFilePath = path.join(activeLogsDir, errFile);
+          const errFilePath = path.join(logsDir, errFile);
           const errContent = fs.readFileSync(errFilePath, 'utf8');
           const errData = JSON.parse(errContent);
           
           const pngFile = errFile.slice(0, -4) + 'png';
-          const screenshotUrl = fs.existsSync(path.join(activeLogsDir, pngFile)) ? `/logs-static/${pngFile}` : null;
+          const screenshotUrl = fs.existsSync(path.join(logsDir, pngFile)) ? `/logs-static/${pngFile}?workspace=${encodeURIComponent(workspace)}` : null;
 
           bodies[index++] = {
             req: errData,
@@ -567,12 +572,12 @@ app.get('/api/logs/:folder/bodies', (req, res) => {
     }
   }
 
-  if (!isValidLogDir(folder)) {
+  if (!isValidLogDir(folder, logsDir)) {
     return res.status(400).json({ error: 'Invalid or inaccessible log directory' });
   }
 
   try {
-    const bodiesPath = path.join(activeLogsDir, folder, 'bodies.json');
+    const bodiesPath = path.join(logsDir, folder, 'bodies.json');
     const content = fs.readFileSync(bodiesPath, 'utf8');
     const bodies = JSON.parse(content);
     res.json(bodies);

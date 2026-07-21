@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=3">
 </head>
 <body>
   <!-- App Container -->
@@ -97,10 +97,28 @@
               </svg>
               <span>Clean All</span>
             </button>
+
+            <button class="btn-theme-toggle" title="Toggle Light/Dark Theme">
+              <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+              <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
           </div>
 
           <div class="session-list-container">
             <div class="list-header">
+              <span style="text-align: center;">Comp</span>
               <span>Log Directory</span>
               <span class="text-right">APIs Count</span>
               <span class="text-right">Size</span>
@@ -144,6 +162,13 @@
             <span class="stat-pill success"><strong id="stat-200">0</strong> Success</span>
             <span class="stat-pill error"><strong id="stat-500">0</strong> Errors</span>
           </div>
+          <button id="btn-toggle-view-mode" class="btn-har" style="background-color: var(--accent-purple-dim); color: var(--accent-purple); border-color: rgba(171, 125, 246, 0.4);" title="Toggle between Standard Log Inspector and Journey Timeline Diff View">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; flex-shrink:0;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Timeline View</span>
+          </button>
           <button id="btn-download-session-har" class="btn-har" title="Download entire session as HAR file">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -151,6 +176,22 @@
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             <span>Export Session HAR</span>
+          </button>
+          <button class="btn-theme-toggle" title="Toggle Light/Dark Theme">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
           </button>
         </div>
       </header>
@@ -162,6 +203,13 @@
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
         <input type="text" id="top-payload-search" placeholder="Search request & response payloads for keys or values (e.g. mobileNumber, leadProfileId, errorMsg)..." autocomplete="off">
+        <button id="btn-exclude-filters" class="btn-filter" title="Configure Exclusion Filters" style="margin-left: auto;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; flex-shrink: 0;">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          <span>Exclusions</span>
+          <span id="active-exclusions-badge" class="exclusions-badge zero">0</span>
+        </button>
       </div>
 
       <!-- Main Dashboard Split Pane -->
@@ -234,13 +282,19 @@
                 </div>
               </div>
 
-              <!-- Journey States Timeline (Only visible for journeydropoffparam) -->
+              <!-- Journey States Timeline -->
               <div id="section-timeline" class="details-section" style="display: none;">
                 <div class="section-title-bar">
-                  <svg class="section-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                  <h4>Journey States Timeline</h4>
+                  <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <svg class="section-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                    <h4 id="timeline-title">Journey States Timeline</h4>
+                  </div>
+                  <div class="timeline-toggle-container" id="timeline-toggle-container">
+                    <button id="btn-timeline-response" class="btn-timeline-toggle active" title="Show states from the response of this journeydropoffparam call">Response States</button>
+                    <button id="btn-timeline-requests" class="btn-timeline-toggle" title="Show chronological state progression sent in request payloads across the session">Request Progression</button>
+                  </div>
                 </div>
                 <div class="payload-body">
                   <div class="timeline-container">
@@ -260,6 +314,7 @@
                     <input type="text" class="input-payload-search" placeholder="Find in Request..." data-target="req-json-content">
                     <span class="match-count" id="req-match-count"></span>
                   </div>
+                  <button id="btn-diff-stateinfo" class="btn-json-action" style="display: none; background-color: var(--accent-purple-dim); color: var(--accent-purple); border-color: rgba(171, 125, 246, 0.4);" title="Compare stateInfo changes with previous state in requests">Diff StateInfo</button>
                   <button class="btn-json-action" data-action="expand" data-target="req-json-content">Expand All</button>
                   <button class="btn-json-action" data-action="collapse" data-target="req-json-content">Collapse All</button>
                   <button class="btn-copy" data-target="req-json-content">Copy Request</button>
@@ -309,10 +364,355 @@
 
       </main>
 
+      <!-- Timeline View Container (Initially Hidden) -->
+      <div id="timeline-view-body" style="display: none; flex: 1; gap: 16px; overflow: hidden; padding: 16px;">
+        <!-- Left Pane: Vertical Journey States Timeline -->
+        <section id="timeline-left-pane" class="pane" style="flex: 0 0 350px; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="pane-header">
+            <h3>Journey States Progression</h3>
+            <span id="timeline-state-count" class="count-badge">0 States</span>
+          </div>
+          <div id="timeline-vertical-list" style="flex: 1; overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 0; position: relative;">
+            <!-- Dynamically populated vertical timeline steps -->
+          </div>
+        </section>
+
+        <!-- Right Pane: stateInfo JSON Diff View -->
+        <section id="timeline-right-pane" class="pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 id="timeline-diff-title">State Changes Detail</h3>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);" id="timeline-diff-api-info">
+              Select a state to inspect changes
+            </div>
+          </div>
+          
+          <!-- Empty state for diff -->
+          <div id="timeline-diff-empty" class="inspector-empty" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; color: var(--text-muted); margin-bottom: 12px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <h4>Journey State Changes</h4>
+            <p>Click on any journey state on the left to see the changes made to stateInfo relative to the previous state.</p>
+          </div>
+          
+          <!-- Diff content area -->
+          <div id="timeline-diff-active" style="flex: 1; display: none; flex-direction: column; overflow: hidden; padding: 16px;">
+            <div class="diff-header" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); padding: 0 4px;">
+              <div id="timeline-pane-header-left">Previous stateInfo</div>
+              <div id="timeline-pane-header-right">Current stateInfo</div>
+            </div>
+            <div class="diff-container" style="flex: 1; display: flex; gap: 16px; overflow: hidden;">
+              <div id="timeline-diff-container-left" class="diff-pane" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background-color: var(--bg-input);">
+                <pre><code id="timeline-diff-code-left" class="diff-pane-code" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;"></code></pre>
+              </div>
+              <div id="timeline-diff-container-right" class="diff-pane" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background-color: var(--bg-input);">
+                <pre><code id="timeline-diff-code-right" class="diff-pane-code" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;"></code></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </div>
+
+    <!-- Screen 3: Folder Comparison Screen -->
+    <div id="screen-comparison" class="screen">
+      <!-- Top Navigation Header -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <button id="btn-compare-back" class="btn-icon-label" title="Back to Session List">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Sessions</span>
+          </button>
+          <div class="header-divider"></div>
+          <div class="active-session-info">
+            <span class="session-label">Comparing Log Sessions</span>
+            <h2 id="compare-sessions-title" class="session-name">Session A vs Session B</h2>
+          </div>
+        </div>
+
+        <div class="header-right" style="display: flex; align-items: center; gap: 12px;">
+          <div class="session-stats">
+            <span class="stat-pill success"><strong id="compare-stat-matched">0</strong> Matched</span>
+            <span class="stat-pill orange"><strong id="compare-stat-diff">0</strong> Diffs</span>
+            <span class="stat-pill error"><strong id="compare-stat-missing">0</strong> Missing</span>
+          </div>
+          <button id="btn-compare-settings" class="btn-secondary" title="Ignore Keys Configuration" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>Ignore Keys</span>
+          </button>
+          <button class="btn-theme-toggle" title="Toggle Light/Dark Theme">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Comparison Main Body -->
+      <main class="dashboard-body">
+        
+        <!-- Left Pane: Aligned API List -->
+        <section id="compare-left-pane" class="pane" style="width: 35%; min-width: 320px; border-right: 1px solid var(--border-color); background-color: var(--bg-app);">
+          <div class="pane-header">
+            <h3>Aligned API Transactions</h3>
+            <span id="compare-api-count" class="count-badge">0</span>
+          </div>
+          <div id="compare-api-list" class="api-list">
+            <!-- Aligned transactions populate here -->
+          </div>
+        </section>
+
+        <!-- Right Pane: Side-by-Side Diff Inspector -->
+        <section id="compare-right-pane" class="pane" style="width: 65%; background-color: var(--bg-panel);">
+          <!-- Empty Inspector State -->
+          <div id="compare-inspector-empty" class="inspector-empty">
+            <svg class="inspector-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <h4>Select an Aligned Call</h4>
+            <p>Click on any transaction on the left to inspect the side-by-side JSON payload difference.</p>
+          </div>
+
+          <!-- Active Comparison Details -->
+          <div id="compare-inspector-active" class="inspector-active" style="display:none;">
+            <div class="inspector-header">
+              <div class="method-path-status">
+                <span id="compare-inspect-method" class="badge">POST</span>
+                <span id="compare-inspect-path" class="path">/api/login.json</span>
+                <span id="compare-inspect-status" class="status-pill orange">Diff</span>
+                <span id="compare-inspect-sequence" class="out-of-order-badge" style="display: none;"></span>
+              </div>
+              <div class="diff-tabs">
+                <button class="diff-tab active" data-tab="req">Request Body</button>
+                <button class="diff-tab" data-tab="res">Response Body</button>
+                <button class="diff-tab" data-tab="state">Wizard State</button>
+              </div>
+            </div>
+
+            <!-- Scrollable Split Code Viewer -->
+            <div class="inspector-content" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; height: 100%;">
+              <div class="diff-view-header" style="display: flex; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                  <div id="diff-header-left" style="flex: 1; padding: 8px 16px; border-right: 1px solid var(--border-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Session A</div>
+                  <div id="diff-header-right" style="flex: 1; padding: 8px 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Session B</div>
+              </div>
+              <div class="diff-split-container" style="display: flex; flex: 1; overflow: hidden;">
+                <!-- Left File (Session A) -->
+                <div id="diff-container-left" class="diff-pane-code" style="flex: 1; overflow: auto; border-right: 1px solid var(--border-color); background: var(--bg-code); font-family: 'Fira Code', monospace; font-size: 12px; line-height: 1.5; padding: 12px 0;">
+                  <pre style="margin: 0;"><code id="diff-code-left" style="display: block; padding: 0 16px; white-space: pre;"></code></pre>
+                </div>
+                <!-- Right File (Session B) -->
+                <div id="diff-container-right" class="diff-pane-code" style="flex: 1; overflow: auto; background: var(--bg-code); font-family: 'Fira Code', monospace; font-size: 12px; line-height: 1.5; padding: 12px 0;">
+                  <pre style="margin: 0;"><code id="diff-code-right" style="display: block; padding: 0 16px; white-space: pre;"></code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Comparison Tray (Floating) -->
+    <div id="comparison-tray" class="comparison-tray">
+      <div class="tray-content">
+        <div class="tray-info">
+          <span class="tray-title">Compare Sessions</span>
+          <div id="comparison-pills" class="comparison-pills">
+            <!-- Selected session pills will go here -->
+          </div>
+        </div>
+        <div class="tray-actions">
+          <button id="btn-clear-comparison" class="btn-secondary">Clear</button>
+          <button id="btn-compare-now" class="btn-primary" disabled>
+            <span>Compare</span>
+            <span id="comparison-count-badge" class="btn-badge">0/2</span>
+          </button>
+        </div>
+      </div>
     </div>
 
   </div>
 
-  <script src="app.js"></script>
+  <!-- Modal for Comparison Settings -->
+  <div id="modal-settings" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Comparison Settings</h3>
+        <button id="btn-close-modal-settings" class="btn-close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section" style="margin-bottom: 12px;">
+          <h4>Transaction Matching Strategy</h4>
+          <div class="matching-strategy-options" style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px;">
+            <label class="radio-label" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-main);">
+              <input type="radio" name="matchingStrategy" value="strict" checked style="margin-top: 3px; cursor: pointer;" />
+              <div>
+                <span style="font-weight: 600;">Strict Sequence Order (LCS)</span>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted);">Aligns transactions strictly chronologically. Out-of-order calls show up as separate additions/deletions.</p>
+              </div>
+            </label>
+            <label class="radio-label" style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-main);">
+              <input type="radio" name="matchingStrategy" value="flexible" style="margin-top: 3px; cursor: pointer;" />
+              <div>
+                <span style="font-weight: 600;">Allow Out-of-Order Matching</span>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: var(--text-muted);">Matches identical API calls even if they run in a different sequence, flagging order deviations.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style="height: 1px; background-color: var(--border-color); margin: 12px 0;"></div>
+
+        <p class="modal-description">
+          Specify key patterns (Regex supported, case-insensitive by default) to ignore during payload comparison. Differences in matching keys will not mark a transaction as changed, and they will be omitted from the diff view.
+        </p>
+        
+        <div class="settings-section">
+          <h4>Active Ignored Keys / Patterns</h4>
+          <div id="ignored-keys-container" class="ignored-keys-pills-container">
+            <!-- Pills populated by JS -->
+          </div>
+        </div>
+
+        <form id="form-add-ignored-key" class="add-ignored-key-form">
+          <input type="text" id="input-ignored-key" placeholder="Enter key name or regex pattern (e.g. .*Id, time.*)..." required autocomplete="off" />
+          <button type="submit" class="btn-primary">Add</button>
+        </form>
+
+        <div class="settings-presets">
+          <span>Common presets (click to add):</span>
+          <div class="preset-buttons">
+            <button type="button" class="btn-preset" data-key="timestamp">timestamp</button>
+            <button type="button" class="btn-preset" data-key="txnId">txnId</button>
+            <button type="button" class="btn-preset" data-key="transactionId">transactionId</button>
+            <button type="button" class="btn-preset" data-key="sessionId">sessionId</button>
+            <button type="button" class="btn-preset" data-key="token">token</button>
+            <button type="button" class="btn-preset" data-key="requestId">requestId</button>
+            <button type="button" class="btn-preset" data-key="correlationId">correlationId</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-reset-defaults" class="btn-secondary">Reset Defaults</button>
+        <button id="btn-apply-settings" class="btn-primary">Apply & Compare</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for API Exclusions -->
+  <div id="modal-exclusions" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="width: 550px;">
+      <div class="modal-header">
+        <h3>Exclusion Filters</h3>
+        <button id="btn-close-modal-exclusions" class="btn-close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+        <p class="modal-description">
+          Define filters to exclude specific API calls from the transaction list. Hidden calls will not be shown in the sidebar or affect error / success statistics.
+        </p>
+
+        <div class="settings-section">
+          <h4>Active Filters</h4>
+          <div id="exclusions-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding: 12px; background-color: var(--bg-app); border: 1px solid var(--border-color); border-radius: 8px;">
+            <!-- Exclusions items dynamically populated here -->
+          </div>
+        </div>
+
+        <div style="height: 1px; background-color: var(--border-color); margin: 4px 0;"></div>
+
+        <div class="settings-section">
+          <h4>Add Exclusion Rule</h4>
+          <form id="form-add-exclusion" style="display: flex; gap: 8px; align-items: flex-end; margin-top: 4px;">
+            <div style="display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; width: 100px;">
+              <label style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Method</label>
+              <select id="input-exclusion-method" class="select-input" style="height: 32px; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-bright); padding: 0 8px; font-size: 13px; font-family: var(--font-sans); cursor: pointer; outline: none; width: 100%;">
+                <option value="ANY">ANY</option>
+                <option value="OPTIONS">OPTIONS</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+                <option value="HEAD">HEAD</option>
+              </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1;">
+              <label style="font-size: 11px; color: var(--text-muted); font-weight: 500;">URL / Path Pattern (Regex)</label>
+              <input type="text" id="input-exclusion-pattern" placeholder="e.g. \.(js|css|svg)$ or /healthcheck" required autocomplete="off" style="height: 32px; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-bright); padding: 0 10px; font-size: 13px; font-family: var(--font-sans); outline: none;" />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;">
+              <button type="submit" class="btn-primary" style="height: 32px; padding: 0 14px; font-size: 13px;">Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); background-color: var(--modal-footer-bg); display: flex; justify-content: space-between;">
+        <button id="btn-reset-exclusions" class="btn-secondary">Reset Defaults</button>
+        <button id="btn-apply-exclusions" class="btn-primary">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for StateInfo Diff -->
+  <div id="modal-stateinfo-diff" class="modal-overlay" style="display: none;">
+    <div class="modal-dialog" style="max-width: 90vw; width: 1200px; height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3 id="stateinfo-diff-title">StateInfo Object Changes</h3>
+        <button id="btn-close-modal-stateinfo-diff" class="btn-close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 16px;">
+        <div class="diff-header" style="display: flex; justify-content: space-between; margin-bottom: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+          <div id="stateinfo-diff-header-left">Previous State</div>
+          <div id="stateinfo-diff-header-right">Current State</div>
+        </div>
+        <div class="diff-container" style="flex: 1; display: flex; gap: 16px; overflow: hidden;">
+          <div id="stateinfo-diff-container-left" class="diff-pane" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background-color: var(--bg-input);">
+            <pre><code id="stateinfo-diff-code-left" class="diff-pane-code" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;"></code></pre>
+          </div>
+          <div id="stateinfo-diff-container-right" class="diff-pane" style="flex: 1; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background-color: var(--bg-input);">
+            <pre><code id="stateinfo-diff-code-right" class="diff-pane-code" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=3"></script>
 </body>
 </html>
