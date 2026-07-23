@@ -272,6 +272,8 @@
                   <div class="payload-search-container">
                     <input type="text" class="input-payload-search" placeholder="Find in State..." data-target="state-json-content">
                     <span class="match-count" id="state-match-count"></span>
+                    <button class="btn-search-nav prev" title="Previous match (Shift+Enter or Up)" data-target="state-json-content" disabled>&#9650;</button>
+                    <button class="btn-search-nav next" title="Next match (Enter or Down)" data-target="state-json-content" disabled>&#9660;</button>
                   </div>
                   <button class="btn-json-action" data-action="expand" data-target="state-json-content">Expand All</button>
                   <button class="btn-json-action" data-action="collapse" data-target="state-json-content">Collapse All</button>
@@ -313,8 +315,9 @@
                   <div class="payload-search-container">
                     <input type="text" class="input-payload-search" placeholder="Find in Request..." data-target="req-json-content">
                     <span class="match-count" id="req-match-count"></span>
+                    <button class="btn-search-nav prev" title="Previous match (Shift+Enter or Up)" data-target="req-json-content" disabled>&#9650;</button>
+                    <button class="btn-search-nav next" title="Next match (Enter or Down)" data-target="req-json-content" disabled>&#9660;</button>
                   </div>
-                  <button id="btn-diff-stateinfo" class="btn-json-action" style="display: none; background-color: var(--accent-purple-dim); color: var(--accent-purple); border-color: rgba(171, 125, 246, 0.4);" title="Compare stateInfo changes with previous state in requests">Diff StateInfo</button>
                   <button class="btn-json-action" data-action="expand" data-target="req-json-content">Expand All</button>
                   <button class="btn-json-action" data-action="collapse" data-target="req-json-content">Collapse All</button>
                   <button class="btn-copy" data-target="req-json-content">Copy Request</button>
@@ -334,6 +337,8 @@
                   <div class="payload-search-container">
                     <input type="text" class="input-payload-search" placeholder="Find in Response..." data-target="res-json-content">
                     <span class="match-count" id="res-match-count"></span>
+                    <button class="btn-search-nav prev" title="Previous match (Shift+Enter or Up)" data-target="res-json-content" disabled>&#9650;</button>
+                    <button class="btn-search-nav next" title="Next match (Enter or Down)" data-target="res-json-content" disabled>&#9660;</button>
                   </div>
                   <button class="btn-json-action" data-action="expand" data-target="res-json-content">Expand All</button>
                   <button class="btn-json-action" data-action="collapse" data-target="res-json-content">Collapse All</button>

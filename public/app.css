@@ -965,6 +965,32 @@ body {
   color: var(--text-muted);
 }
 
+.btn-search-nav {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+  line-height: 1;
+}
+
+.btn-search-nav:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--border-color-focus);
+  color: var(--text-bright);
+}
+
+.btn-search-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* Copy button */
 .btn-copy {
   background-color: rgba(255, 255, 255, 0.05);
@@ -1039,11 +1065,20 @@ body {
 
 /* Highlight matching search results */
 mark.json-highlight {
-  background-color: #f2ca30;
-  color: #000000;
+  background-color: rgba(242, 202, 48, 0.45);
+  color: #ffffff;
   border-radius: 2px;
   padding: 0 1px;
-  box-shadow: 0 0 6px rgba(242, 202, 48, 0.6);
+  border-bottom: 2px solid #f2ca30;
+  transition: all 0.15s ease-in-out;
+}
+
+mark.json-highlight.active {
+  background-color: #ff9800;
+  color: #000000;
+  font-weight: bold;
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.9);
+  border-radius: 2px;
 }
 
 /* Cleaning and Deletion Controls */

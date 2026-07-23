@@ -207,7 +207,18 @@ function initEventListeners() {
   // Payload search inputs
   document.querySelectorAll('.input-payload-search').forEach(input => {
     input.addEventListener('input', handlePayloadSearch);
+    input.addEventListener('keydown', handlePayloadSearchKeydown);
     input.addEventListener('click', (e) => e.stopPropagation()); // Prevent collapsing accordion
+  });
+
+  // Prev / Next Search Navigation Buttons
+  document.querySelectorAll('.btn-search-nav').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetId = btn.getAttribute('data-target');
+      const direction = btn.classList.contains('prev') ? -1 : 1;
+      navigatePayloadSearch(targetId, direction);
+    });
   });
   
   // Copy Buttons
@@ -1268,10 +1279,10 @@ function selectApi(id, updateUrl = true) {
 }
 
 function renderInspector() {
-  const api = state.apis.find(a => a.id === state.selectedApiId);
-  const bodies = state.bodies[state.selectedApiId];
+  const api = state.apis.find(a => String(a.id) === String(state.selectedApiId));
+  const bodies = (state.selectedApiId !== null && state.bodies && state.bodies[state.selectedApiId]) ? state.bodies[state.selectedApiId] : { req: null, res: null };
   
-  if (!api || !bodies) {
+  if (!api) {
     el.inspectorActive.style.display = 'none';
     el.inspectorEmpty.style.display = 'flex';
     return;
@@ -1285,6 +1296,10 @@ function renderInspector() {
     count.innerText = '';
     count.className = 'match-count';
   });
+  document.querySelectorAll('.btn-search-nav').forEach(btn => {
+    btn.disabled = true;
+  });
+  for (const k in payloadSearchState) delete payloadSearchState[k];
   
   el.inspectorEmpty.style.display = 'none';
   el.inspectorActive.style.display = 'flex';
@@ -1312,48 +1327,18 @@ function renderInspector() {
   el.stateJsonContent.innerHTML = '';
   el.stateJsonContent.dataset.raw = '';
 
-  // Handle stateInfo Diff button visibility and click logic
-  const currentInfo = getRequestStateInfo(api.id);
-  const prevData = getPreviousRequestStateInfo(api.id);
-  const btnDiffStateInfo = document.getElementById('btn-diff-stateinfo');
-  if (btnDiffStateInfo) {
-    if (currentInfo) {
-      btnDiffStateInfo.style.display = 'inline-block';
-      if (prevData) {
-        btnDiffStateInfo.title = `Compare stateInfo changes with previous state (${prevData.stateName || 'No State'} in API #${prevData.apiId})`;
-        btnDiffStateInfo.onclick = (e) => {
-          e.stopPropagation();
-          openStateInfoDiffModal(prevData.stateInfo, currentInfo, prevData.apiId, api.id, prevData.stateName, getRequestState(api.id));
-        };
-      } else {
-        btnDiffStateInfo.title = `Compare stateInfo changes (initial state)`;
-        btnDiffStateInfo.onclick = (e) => {
-          e.stopPropagation();
-          openStateInfoDiffModal({}, currentInfo, 'Initial', api.id, 'Empty State', getRequestState(api.id));
-        };
-      }
-    } else {
-      btnDiffStateInfo.style.display = 'none';
-    }
-  }
+  // Render Timeline/Stepper for journeydropoffparam.json calls
+  const isParamCall = api.path.includes('journeydropoffparam.json');
 
-  // Render Timeline/Stepper for journey states
-  const isStateCall = api.path.includes('journeydropoffparam.json') || 
-                      api.path.includes('journeydropoffupdate.json') || 
-                      api.path.includes('journeydropoff.json');
-
-  if (isStateCall) {
+  if (isParamCall && el.sectionTimeline) {
     el.sectionTimeline.style.display = 'block';
     el.sectionTimeline.classList.remove('collapsed');
     
-    // Toggle container is only visible if the api path is journeydropoffparam.json
-    const isParamCall = api.path.includes('journeydropoffparam.json');
     if (el.timelineToggleContainer) {
-      el.timelineToggleContainer.style.display = isParamCall ? 'flex' : 'none';
+      el.timelineToggleContainer.style.display = 'flex';
     }
     
-    // Decide active timeline source
-    const activeSource = isParamCall ? state.timelineSource : 'requests';
+    const activeSource = state.timelineSource || 'response';
     
     if (activeSource === 'response') {
       if (el.timelineTitle) el.timelineTitle.innerText = 'Journey States Timeline (Response)';
@@ -1450,9 +1435,9 @@ function renderInspector() {
         el.timelineStepsList.innerHTML = `<div class="empty-state" style="padding: 10px; text-align: center;"><p>No states sent in request payloads.</p></div>`;
       }
     }
-  } else {
+  } else if (el.sectionTimeline) {
     el.sectionTimeline.style.display = 'none';
-    el.timelineStepsList.innerHTML = '';
+    if (el.timelineStepsList) el.timelineStepsList.innerHTML = '';
   }
 
   // Render Screenshot if present
@@ -1512,16 +1497,22 @@ function expandStateNodeAtIndex(containerEl, index) {
 
 // --- PAYLOAD SEARCH AND TEXT HIGHLIGHT HANDLER ---
 
+const payloadSearchState = {};
+
 function handlePayloadSearch(e) {
   const query = e.target.value.trim();
   const targetId = e.target.getAttribute('data-target');
   const targetEl = document.getElementById(targetId);
   
-  // Find matching count indicator ID
+  // Find matching count indicator ID & navigation buttons
   let countId = 'req-match-count';
   if (targetId === 'state-json-content') countId = 'state-match-count';
   if (targetId === 'res-json-content') countId = 'res-match-count';
   const countEl = document.getElementById(countId);
+
+  const container = e.target.closest('.payload-search-container');
+  const prevBtn = container ? container.querySelector('.btn-search-nav.prev') : null;
+  const nextBtn = container ? container.querySelector('.btn-search-nav.next') : null;
   
   if (!targetEl || !targetEl.dataset.raw) return;
   
@@ -1535,11 +1526,15 @@ function handlePayloadSearch(e) {
     targetEl.innerText = rawData;
   }
   
+  payloadSearchState[targetId] = { activeIndex: 0, count: 0 };
+
   if (!query) {
     if (countEl) {
       countEl.innerText = '';
       countEl.className = 'match-count';
     }
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
     return;
   }
   
@@ -1569,7 +1564,7 @@ function handlePayloadSearch(e) {
           if (parent.classList.contains('collapsed')) {
             parent.classList.remove('collapsed');
           }
-          parent = parent.parentElement.closest('.json-node');
+          parent = parent.parentElement ? parent.parentElement.closest('.json-node') : null;
         }
       }
     });
@@ -1583,21 +1578,83 @@ function handlePayloadSearch(e) {
     targetEl.innerHTML = highlightedHtml;
   }
   
-  if (countEl) {
-    if (matchCount > 0) {
-      countEl.innerText = `${matchCount} found`;
+  const matches = targetEl.querySelectorAll('mark.json-highlight');
+
+  if (matches.length > 0) {
+    payloadSearchState[targetId] = { activeIndex: 0, count: matches.length };
+    matches[0].classList.add('active');
+
+    if (countEl) {
+      countEl.innerText = `1 of ${matches.length}`;
       countEl.className = 'match-count active';
-    } else {
+    }
+    if (prevBtn) prevBtn.disabled = false;
+    if (nextBtn) nextBtn.disabled = false;
+
+    matches[0].scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+  } else {
+    if (countEl) {
       countEl.innerText = 'no matches';
       countEl.className = 'match-count empty';
     }
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
   }
+}
+
+function handlePayloadSearchKeydown(e) {
+  if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const targetId = e.target.getAttribute('data-target');
+    const direction = (e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)) ? -1 : 1;
+    navigatePayloadSearch(targetId, direction);
+  }
+}
+
+function navigatePayloadSearch(targetId, direction) {
+  const targetEl = document.getElementById(targetId);
+  if (!targetEl) return;
+
+  let countId = 'req-match-count';
+  if (targetId === 'state-json-content') countId = 'state-match-count';
+  if (targetId === 'res-json-content') countId = 'res-match-count';
+  const countEl = document.getElementById(countId);
+
+  const matches = targetEl.querySelectorAll('mark.json-highlight');
+  if (!matches.length) return;
+
+  const state = payloadSearchState[targetId] || { activeIndex: 0, count: matches.length };
   
-  // Auto-scroll to the first highlighted match
-  const firstMatch = targetEl.querySelector('mark');
-  if (firstMatch) {
-    firstMatch.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  // Unset previous active match
+  if (matches[state.activeIndex]) {
+    matches[state.activeIndex].classList.remove('active');
   }
+
+  let nextIndex = state.activeIndex + direction;
+  if (nextIndex >= matches.length) nextIndex = 0;
+  if (nextIndex < 0) nextIndex = matches.length - 1;
+
+  state.activeIndex = nextIndex;
+  payloadSearchState[targetId] = state;
+
+  const currentMatch = matches[nextIndex];
+  currentMatch.classList.add('active');
+
+  // Auto-expand parents if collapsed
+  let parent = currentMatch.closest('.json-node');
+  while (parent && targetEl.contains(parent)) {
+    if (parent.classList.contains('collapsed')) {
+      parent.classList.remove('collapsed');
+    }
+    parent = parent.parentElement ? parent.parentElement.closest('.json-node') : null;
+  }
+
+  if (countEl) {
+    countEl.innerText = `${nextIndex + 1} of ${matches.length}`;
+    countEl.className = 'match-count active';
+  }
+
+  currentMatch.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
 }
 
 // --- TOP LEVEL PAYLOAD FILTER ---
@@ -1814,7 +1871,7 @@ function applyTopPayloadSearch(options = {}) {
   updateExclusionsBadge();
   
   // 3. Auto-clear selected API if it is now excluded
-  const selectedIsExcluded = state.selectedApiId !== null && !nonExcludedApis.some(api => api.id === state.selectedApiId);
+  const selectedIsExcluded = state.selectedApiId !== null && !nonExcludedApis.some(api => String(api.id) === String(state.selectedApiId));
   if (selectedIsExcluded) {
     state.selectedApiId = null;
     if (el.inspectorActive) el.inspectorActive.style.display = 'none';
@@ -2052,9 +2109,9 @@ function renderJsonToElement(val, containerEl) {
 }
 
 function handleDownloadHar() {
-  const api = state.apis.find(a => a.id === state.selectedApiId);
-  const bodies = state.bodies[state.selectedApiId];
-  if (!api || !bodies) return;
+  const api = state.apis.find(a => String(a.id) === String(state.selectedApiId));
+  const bodies = (state.selectedApiId !== null && state.bodies && state.bodies[state.selectedApiId]) ? state.bodies[state.selectedApiId] : { req: null, res: null };
+  if (!api) return;
   downloadHar(api, bodies);
 }
 
